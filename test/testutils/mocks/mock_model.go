@@ -1,6 +1,8 @@
 package mocks
 
 import (
+	"errors"
+
 	"github.com/stretchr/testify/mock"
 	"one-api/model"
 )
@@ -194,6 +196,30 @@ func (m *MockModelInterface) GetUserLogsList(userId int, params *model.LogsListP
 	return args.Get(0).(*model.DataResult[model.Log]), args.Error(1)
 }
 
+// CreateTeam Mock CreateTeam 函数
+func (m *MockModelInterface) CreateTeam(team *model.Team) error {
+	args := m.Called(team)
+	return args.Error(0)
+}
+
+// CreateTeamMember Mock CreateTeamMember 函数
+func (m *MockModelInterface) CreateTeamMember(member *model.TeamMember) error {
+	args := m.Called(member)
+	return args.Error(0)
+}
+
+// UpdateTeam Mock UpdateTeam 函数
+func (m *MockModelInterface) UpdateTeam(team *model.Team) error {
+	args := m.Called(team)
+	return args.Error(0)
+}
+
+// DeleteTeam Mock DeleteTeam 函数
+func (m *MockModelInterface) DeleteTeam(team *model.Team) error {
+	args := m.Called(team)
+	return args.Error(0)
+}
+
 // MockModelHelper Mock 模型辅助函数
 type MockModelHelper struct{}
 
@@ -237,7 +263,7 @@ func (h *MockModelHelper) SetupMockUserModelSuccess(mockModel *MockModelInterfac
 	mockModel.On("GetUserById", user.Id, mock.AnythingOfType("bool")).Return(user, nil)
 	mockModel.On("GetUsersList", mock.AnythingOfType("*model.GenericParams")).Return(&model.DataResult[model.User]{
 		Data: &[]*model.User{user},
-		Total: 1,
+		TotalCount: 1,
 		Page: 1,
 		Size: 10,
 	}, nil)
@@ -248,7 +274,7 @@ func (h *MockModelHelper) SetupMockLogModelSuccess(mockModel *MockModelInterface
 	mockModel.On("RecordLog", mock.AnythingOfType("int"), mock.AnythingOfType("int"), mock.AnythingOfType("string")).Return()
 	mockModel.On("GetUserLogsList", mock.AnythingOfType("int"), mock.AnythingOfType("*model.LogsListParams")).Return(&model.DataResult[model.Log]{
 		Data: &[]*model.Log{},
-		Total: 0,
+		TotalCount: 0,
 		Page: 1,
 		Size: 10,
 	}, nil)

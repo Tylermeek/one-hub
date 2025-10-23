@@ -179,6 +179,7 @@ func SetApiRouter(router *gin.Engine) {
 
 		tokenRoute := apiRouter.Group("/token")
 		tokenRoute.Use(middleware.UserAuth())
+		tokenRoute.Use(middleware.ContextMiddleware()) // 添加上下文中间件
 		{
 			tokenRoute.GET("/playground", controller.GetPlaygroundToken)
 			tokenRoute.GET("/", controller.GetUserTokensList)
@@ -273,6 +274,14 @@ func SetApiRouter(router *gin.Engine) {
 
 		// 公开路由：邀请注册
 		apiRouter.POST("/team/register", controller.RegisterWithInvite)
+	}
+
+	// 上下文管理路由
+	contextRoute := apiRouter.Group("/context")
+	contextRoute.Use(middleware.UserAuth())
+	{
+		contextRoute.POST("/switch", controller.SwitchContext)
+		contextRoute.GET("/current", controller.GetCurrentContext)
 	}
 
 	sseRouter := router.Group("/api/sse")

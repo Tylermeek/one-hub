@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"gorm.io/gorm"
+	gormLogger "gorm.io/gorm/logger"
 
 	"one-api/model"
 	"one-api/test/testutils"
@@ -24,7 +25,12 @@ type TeamConcurrentSuite struct {
 
 // SetupSuite 测试套件初始化
 func (suite *TeamConcurrentSuite) SetupSuite() {
-	suite.db = testutils.SetupTestDB(suite.T(), nil)
+	config := &testutils.TestConfig{
+		DBType:      "sqlite",
+		LogLevel:    gormLogger.Silent,
+		AutoMigrate: true,
+	}
+	suite.db = testutils.SetupTestDB(suite.T(), config)
 	suite.factory = testutils.NewTestDataFactory()
 }
 
@@ -45,7 +51,7 @@ func (suite *TeamConcurrentSuite) TestConcurrentTeamCreation() {
 	
 	// 创建测试用户
 	owner := userFactory.CreateUserWithQuota(10000000)
-	err := suite.db.Create(owner).Error
+	err := owner.Insert(0)
 	require.NoError(suite.T(), err)
 	
 	// 并发创建团队
@@ -91,7 +97,7 @@ func (suite *TeamConcurrentSuite) TestConcurrentQuotaAllocation() {
 	
 	// 创建测试用户（大额度）
 	owner := userFactory.CreateUserWithQuota(10000000)
-	err := suite.db.Create(owner).Error
+	err := owner.Insert(0)
 	require.NoError(suite.T(), err)
 	
 	// 创建测试团队
@@ -148,14 +154,14 @@ func (suite *TeamConcurrentSuite) TestConcurrentQuotaConsumption() {
 	
 	// 创建测试用户
 	owner := userFactory.CreateUserWithQuota(1000000)
-	err := suite.db.Create(owner).Error
+	err := owner.Insert(0)
 	require.NoError(suite.T(), err)
 	
 	// 创建多个测试用户
 	var members []*model.User
 	for i := 0; i < 5; i++ {
 		member := userFactory.CreateUserWithUsername("member" + string(rune(i)))
-		err := suite.db.Create(member).Error
+		err := member.Insert(0)
 		require.NoError(suite.T(), err)
 		members = append(members, member)
 	}
@@ -218,14 +224,14 @@ func (suite *TeamConcurrentSuite) TestConcurrentMemberOperations() {
 	
 	// 创建测试用户
 	owner := userFactory.CreateUserWithQuota(1000000)
-	err := suite.db.Create(owner).Error
+	err := owner.Insert(0)
 	require.NoError(suite.T(), err)
 	
 	// 创建多个测试用户
 	var members []*model.User
 	for i := 0; i < 10; i++ {
 		member := userFactory.CreateUserWithUsername("member" + string(rune(i)))
-		err := suite.db.Create(member).Error
+		err := member.Insert(0)
 		require.NoError(suite.T(), err)
 		members = append(members, member)
 	}
@@ -280,9 +286,9 @@ func (suite *TeamConcurrentSuite) TestConcurrentMixedOperations() {
 	// 创建测试用户
 	owner := userFactory.CreateUserWithQuota(10000000)
 	member := userFactory.CreateUserWithQuota(1000000)
-	err := suite.db.Create(owner).Error
+	err := owner.Insert(0)
 	require.NoError(suite.T(), err)
-	err = suite.db.Create(member).Error
+	err = member.Insert(0)
 	require.NoError(suite.T(), err)
 	
 	// 创建测试团队
@@ -354,9 +360,9 @@ func (suite *TeamConcurrentSuite) TestConcurrentWithContext() {
 	// 创建测试用户
 	owner := userFactory.CreateUserWithQuota(1000000)
 	member := userFactory.CreateUserWithQuota(100000)
-	err := suite.db.Create(owner).Error
+	err := owner.Insert(0)
 	require.NoError(suite.T(), err)
-	err = suite.db.Create(member).Error
+	err = member.Insert(0)
 	require.NoError(suite.T(), err)
 	
 	// 创建测试团队
@@ -420,9 +426,9 @@ func (suite *TeamConcurrentSuite) TestConcurrentDeadlockPrevention() {
 	// 创建测试用户
 	owner := userFactory.CreateUserWithQuota(1000000)
 	member := userFactory.CreateUserWithQuota(100000)
-	err := suite.db.Create(owner).Error
+	err := owner.Insert(0)
 	require.NoError(suite.T(), err)
-	err = suite.db.Create(member).Error
+	err = member.Insert(0)
 	require.NoError(suite.T(), err)
 	
 	// 创建两个测试团队
@@ -489,9 +495,9 @@ func (suite *TeamConcurrentSuite) TestConcurrentErrorHandling() {
 	// 创建测试用户
 	owner := userFactory.CreateUserWithQuota(100000)
 	member := userFactory.CreateUserWithQuota(100000)
-	err := suite.db.Create(owner).Error
+	err := owner.Insert(0)
 	require.NoError(suite.T(), err)
-	err = suite.db.Create(member).Error
+	err = member.Insert(0)
 	require.NoError(suite.T(), err)
 	
 	// 创建测试团队（额度较少）
@@ -549,7 +555,7 @@ func (suite *TeamConcurrentSuite) TestConcurrentRaceCondition() {
 	
 	// 创建测试用户
 	owner := userFactory.CreateUserWithQuota(1000000)
-	err := suite.db.Create(owner).Error
+	err := owner.Insert(0)
 	require.NoError(suite.T(), err)
 	
 	// 创建测试团队
@@ -606,9 +612,9 @@ func (suite *TeamConcurrentSuite) BenchmarkConcurrentQuotaConsumption(b *testing
 	// 创建测试数据
 	owner := userFactory.CreateUserWithQuota(100000000)
 	member := userFactory.CreateUserWithQuota(100000000)
-	err := suite.db.Create(owner).Error
+	err := owner.Insert(0)
 	require.NoError(suite.T(), err)
-	err = suite.db.Create(member).Error
+	err = member.Insert(0)
 	require.NoError(suite.T(), err)
 	
 	team := teamFactory.CreateTeamWithQuota(owner.Id, 50000000)
@@ -635,7 +641,7 @@ func (suite *TeamConcurrentSuite) BenchmarkConcurrentQuotaAllocation(b *testing.
 	
 	// 创建测试数据
 	owner := userFactory.CreateUserWithQuota(100000000)
-	err := suite.db.Create(owner).Error
+	err := owner.Insert(0)
 	require.NoError(suite.T(), err)
 	
 	team := teamFactory.CreateTeamWithQuota(owner.Id, 0)
@@ -649,6 +655,187 @@ func (suite *TeamConcurrentSuite) BenchmarkConcurrentQuotaAllocation(b *testing.
 			_ = model.AllocateQuotaToTeam(owner.Id, team.Id, 1000, false)
 		}
 	})
+}
+
+// TestConcurrentContextSwitching 测试并发空间切换
+func (suite *TeamConcurrentSuite) TestConcurrentContextSwitching() {
+	userFactory := suite.factory.NewUserFactory()
+	teamFactory := suite.factory.NewTeamFactory()
+	
+	// 创建测试用户
+	owner := userFactory.CreateUserWithQuota(1000000)
+	err := owner.Insert(0)
+	require.NoError(suite.T(), err)
+	
+	// 创建测试团队
+	team := teamFactory.CreateTeam(owner.Id)
+	err = suite.db.Create(team).Error
+	require.NoError(suite.T(), err)
+	
+	// 添加用户为团队成员
+	member := &model.TeamMember{
+		TeamId:     team.Id,
+		UserId:     owner.Id,
+		Role:       1, // 管理员
+		Status:     1,
+		JoinedTime: time.Now().Unix(),
+	}
+	err = member.Insert(0)
+	require.NoError(suite.T(), err)
+	
+	// 并发测试空间切换
+	var wg sync.WaitGroup
+	results := make(chan error, 20)
+	
+	for i := 0; i < 10; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			
+			// 模拟切换到团队空间
+			token := &model.Token{
+				UserId:         owner.Id,
+				Name:           "并发测试Token",
+				Key:            "sk-concurrent-token-" + time.Now().Format("20060102150405"),
+				RemainQuota:    1000,
+				UnlimitedQuota: false,
+			}
+			
+			err := token.InsertWithContext("team", team.Id)
+			results <- err
+		}()
+		
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			
+			// 模拟切换到用户空间
+			token := &model.Token{
+				UserId:         owner.Id,
+				Name:           "并发测试个人Token",
+				Key:            "sk-concurrent-user-token-" + time.Now().Format("20060102150405"),
+				RemainQuota:    1000,
+				UnlimitedQuota: false,
+			}
+			
+			err := token.InsertWithContext("user", owner.Id)
+			results <- err
+		}()
+	}
+	
+	wg.Wait()
+	close(results)
+	
+	// 检查结果
+	successCount := 0
+	for err := range results {
+		if err == nil {
+			successCount++
+		}
+	}
+	
+	// 所有操作都应该成功
+	assert.Equal(suite.T(), 20, successCount)
+	
+	// 验证Token数量
+	var teamTokenCount int64
+	suite.db.Model(&model.Token{}).Where("user_id = ? AND owner_type = ? AND owner_id = ?", 
+		owner.Id, "team", team.Id).Count(&teamTokenCount)
+	assert.Equal(suite.T(), int64(10), teamTokenCount)
+	
+	var userTokenCount int64
+	suite.db.Model(&model.Token{}).Where("user_id = ? AND owner_type = ? AND owner_id = ?", 
+		owner.Id, "user", owner.Id).Count(&userTokenCount)
+	assert.Equal(suite.T(), int64(10), userTokenCount)
+}
+
+// TestConcurrentPermissionValidation 测试并发权限验证
+func (suite *TeamConcurrentSuite) TestConcurrentPermissionValidation() {
+	userFactory := suite.factory.NewUserFactory()
+	teamFactory := suite.factory.NewTeamFactory()
+	
+	// 创建测试用户
+	owner := userFactory.CreateUserWithQuota(1000000)
+	err := owner.Insert(0)
+	require.NoError(suite.T(), err)
+	
+	otherUser := userFactory.CreateUserWithQuota(100000)
+		err = otherUser.Insert(0)
+	require.NoError(suite.T(), err)
+	
+	// 创建测试团队
+	team := teamFactory.CreateTeam(owner.Id)
+	err = suite.db.Create(team).Error
+	require.NoError(suite.T(), err)
+	
+	// 并发测试权限验证
+	var wg sync.WaitGroup
+	results := make(chan error, 20)
+	
+	for i := 0; i < 10; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			
+			// 有权限的用户创建Token
+			token := &model.Token{
+				UserId:         owner.Id,
+				Name:           "有权限Token",
+				Key:            "sk-authorized-token-" + time.Now().Format("20060102150405"),
+				RemainQuota:    1000,
+				UnlimitedQuota: false,
+			}
+			
+			err := token.InsertWithContext("team", team.Id)
+			results <- err
+		}()
+		
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			
+			// 无权限的用户尝试创建Token
+			token := &model.Token{
+				UserId:         otherUser.Id,
+				Name:           "无权限Token",
+				Key:            "sk-unauthorized-token-" + time.Now().Format("20060102150405"),
+				RemainQuota:    1000,
+				UnlimitedQuota: false,
+			}
+			
+			err := token.InsertWithContext("team", team.Id)
+			results <- err
+		}()
+	}
+	
+	wg.Wait()
+	close(results)
+	
+	// 检查结果
+	successCount := 0
+	errorCount := 0
+	for err := range results {
+		if err == nil {
+			successCount++
+		} else {
+			errorCount++
+		}
+	}
+	
+	// 应该有10个成功（有权限）和10个失败（无权限）
+	assert.Equal(suite.T(), 10, successCount)
+	assert.Equal(suite.T(), 10, errorCount)
+	
+	// 验证只有有权限的用户创建了Token
+	var tokenCount int64
+	suite.db.Model(&model.Token{}).Where("user_id = ? AND owner_type = ? AND owner_id = ?", 
+		owner.Id, "team", team.Id).Count(&tokenCount)
+	assert.Equal(suite.T(), int64(10), tokenCount)
+	
+	// 验证无权限的用户没有创建Token
+	suite.db.Model(&model.Token{}).Where("user_id = ? AND owner_type = ? AND owner_id = ?", 
+		otherUser.Id, "team", team.Id).Count(&tokenCount)
+	assert.Equal(suite.T(), int64(0), tokenCount)
 }
 
 // TestTeamConcurrentSuite 运行测试套件

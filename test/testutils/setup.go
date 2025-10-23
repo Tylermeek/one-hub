@@ -7,15 +7,16 @@ import (
 	"github.com/stretchr/testify/require"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
-	"gorm.io/gorm/logger"
+	gormLogger "gorm.io/gorm/logger"
 
+	"one-api/common/logger"
 	"one-api/model"
 )
 
 // TestConfig 测试配置
 type TestConfig struct {
 	DBType     string // mock, sqlite, mysql
-	LogLevel   logger.LogLevel
+	LogLevel   gormLogger.LogLevel
 	AutoMigrate bool
 }
 
@@ -28,7 +29,7 @@ func DefaultTestConfig() *TestConfig {
 
 	return &TestConfig{
 		DBType:      dbType,
-		LogLevel:    logger.Silent, // 测试时静默日志
+		LogLevel:    gormLogger.Silent, // 测试时静默日志
 		AutoMigrate: true,
 	}
 }
@@ -37,6 +38,11 @@ func DefaultTestConfig() *TestConfig {
 func SetupTestDB(t *testing.T, config *TestConfig) *gorm.DB {
 	if config == nil {
 		config = DefaultTestConfig()
+	}
+
+	// 初始化 logger（如果还没有初始化）
+	if logger.Logger == nil {
+		logger.SetupLogger()
 	}
 
 	var db *gorm.DB
@@ -60,6 +66,7 @@ func SetupTestDB(t *testing.T, config *TestConfig) *gorm.DB {
 			&model.User{},
 			&model.Team{},
 			&model.TeamMember{},
+			&model.Token{},
 			&model.Log{},
 		)
 		require.NoError(t, err, "Failed to auto migrate test database")
@@ -71,7 +78,7 @@ func SetupTestDB(t *testing.T, config *TestConfig) *gorm.DB {
 // setupSQLiteDB 设置 SQLite 测试数据库
 func setupSQLiteDB(t *testing.T, config *TestConfig) (*gorm.DB, error) {
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{
-		Logger: logger.Default.LogMode(config.LogLevel),
+		Logger: gormLogger.Default.LogMode(config.LogLevel),
 	})
 	if err != nil {
 		return nil, err
@@ -110,6 +117,7 @@ func ResetTestDB(t *testing.T, db *gorm.DB) {
 	// 按依赖关系顺序删除数据
 	tables := []interface{}{
 		&model.TeamMember{},
+		&model.Token{},
 		&model.Team{},
 		&model.Log{},
 		&model.User{},

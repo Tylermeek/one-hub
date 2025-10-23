@@ -1,9 +1,12 @@
 package testutils
 
 import (
+	"os"
 	"testing"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
+	"one-api/model"
 )
 
 // DBAdapter 数据库适配器接口
@@ -75,6 +78,7 @@ func (m *MockDBAdapter) Reset() error {
 	// 清空所有表
 	tables := []interface{}{
 		&model.TeamMember{},
+		&model.Token{},
 		&model.Team{},
 		&model.Log{},
 		&model.User{},
@@ -143,6 +147,7 @@ func (s *SQLiteDBAdapter) Reset() error {
 	// 清空所有表
 	tables := []interface{}{
 		&model.TeamMember{},
+		&model.Token{},
 		&model.Team{},
 		&model.Log{},
 		&model.User{},

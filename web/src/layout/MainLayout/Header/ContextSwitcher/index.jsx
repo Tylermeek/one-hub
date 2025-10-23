@@ -16,16 +16,17 @@ import {
 import { Icon } from '@iconify/react';
 import { useTheme } from '@mui/material/styles';
 import { API } from 'utils/api';
-import { enqueueSnackbar } from 'notistack';
-import { SWITCH_CONTEXT, LOAD_USER_TEAMS } from 'store/actions';
-import { renderQuota } from 'utils/common';
+import { LOAD_USER_TEAMS } from 'store/actions';
+import useContext from 'hooks/useContext';
 
 const ContextSwitcher = () => {
     const theme = useTheme();
-    const navigate = useNavigate();
     const dispatch = useDispatch();
     const { currentContext, userTeams } = useSelector((state) => state.context);
     const { user } = useSelector((state) => state.account);
+
+    // 使用 useContext hook 获取 switchContext 函数
+    const { switchContext } = useContext();
 
     const [anchorEl, setAnchorEl] = useState(null);
     const [loading, setLoading] = useState(false);
@@ -68,26 +69,9 @@ const ContextSwitcher = () => {
     };
 
     const handleSwitchContext = (context) => {
-        dispatch({ type: SWITCH_CONTEXT, payload: context });
         handleClose();
-
-        // 显示切换提示
-        enqueueSnackbar(`已切换到「${context.name}」额度`, { variant: 'success' });
-
-        // 触发全局上下文切换事件
-        window.dispatchEvent(new CustomEvent('contextChanged', {
-            detail: { newContext: context, oldContext: currentContext }
-        }));
-
-        // 如果当前在团队相关页面且切换到个人空间，跳转到 Dashboard
-        if (context.type === 'user' && window.location.pathname.includes('/team/')) {
-            navigate('/panel');
-        }
-    };
-
-    const handleCreateTeam = () => {
-        handleClose();
-        navigate('/panel/team');
+        // 调用 useContext hook 中的 switchContext 函数，它会调用后端 API
+        switchContext(context);
     };
 
     // 获取上下文图标

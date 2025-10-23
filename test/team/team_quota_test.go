@@ -1,39 +1,43 @@
 package team
 
 import (
-	"context"
+	"fmt"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
+	gormLogger "gorm.io/gorm/logger"
 
-	"one-hub/model"
+	"one-api/model"
+	"one-api/test/testutils"
 )
 
 // 测试数据库设置
 func setupTestDB(t *testing.T) *gorm.DB {
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
-	require.NoError(t, err)
-
-	// 自动迁移表结构
-	err = db.AutoMigrate(&model.User{}, &model.Team{}, &model.TeamMember{}, &model.Log{})
-	require.NoError(t, err)
-
+	config := &testutils.TestConfig{
+		DBType:      "sqlite",
+		LogLevel:    gormLogger.Silent,
+		AutoMigrate: true,
+	}
+	db := testutils.SetupTestDB(t, config)
+	// 设置全局数据库实例
+	model.SetDB(db)
 	return db
 }
 
 // 创建测试用户
 func createTestUser(db *gorm.DB, t *testing.T, username string, quota int) *model.User {
 	user := &model.User{
-		Username: username,
-		Quota:    quota,
-		Status:   1,
+		Username:    username,
+		Quota:       quota,
+		Status:      1,
+		AccessToken: fmt.Sprintf("test_token_%s_%d", username, time.Now().UnixNano()),
+		AffCode:     fmt.Sprintf("test_aff_%s_%d", username, time.Now().UnixNano()),
 	}
-	err := db.Create(user).Error
+	err := user.Insert(0)
 	require.NoError(t, err)
 	return user
 }
@@ -47,11 +51,11 @@ func createTestTeam(db *gorm.DB, t *testing.T, name string, ownerId int, quota i
 		UsedQuota:      0,
 		UnlimitedQuota: false,
 		Status:         1,
-		InviteCode:     "TEST123",
+		InviteCode:     fmt.Sprintf("TEST_%s_%d", name, time.Now().UnixNano()),
 		CreatedTime:    time.Now().Unix(),
 		UpdatedTime:    time.Now().Unix(),
 	}
-	err := db.Create(team).Error
+	err := team.Insert()
 	require.NoError(t, err)
 	return team
 }
@@ -67,7 +71,7 @@ func createTestTeamMember(db *gorm.DB, t *testing.T, teamId, userId, role int, m
 		Status:     1,
 		JoinedTime: time.Now().Unix(),
 	}
-	err := db.Create(member).Error
+	err := member.Insert()
 	require.NoError(t, err)
 	return member
 }
@@ -75,6 +79,7 @@ func createTestTeamMember(db *gorm.DB, t *testing.T, teamId, userId, role int, m
 // TestAllocateQuotaToTeam 测试团队额度分配
 func TestAllocateQuotaToTeam(t *testing.T) {
 	db := setupTestDB(t)
+	defer testutils.CleanupTestDB(t, db)
 	
 	// 创建测试用户（管理员）
 	owner := createTestUser(db, t, "owner", 1000000)
@@ -86,10 +91,10 @@ func TestAllocateQuotaToTeam(t *testing.T) {
 	err := model.AllocateQuotaToTeam(owner.Id, team.Id, 500000, false)
 	assert.NoError(t, err)
 	
-	// 验证管理员额度减少
+	// 验证管理员额度不变（新逻辑：不扣除管理员个人额度）
 	var updatedOwner model.User
 	db.First(&updatedOwner, owner.Id)
-	assert.Equal(t, 500000, updatedOwner.Quota)
+	assert.Equal(t, 1000000, updatedOwner.Quota)
 	
 	// 验证团队额度增加
 	var updatedTeam model.Team
@@ -108,6 +113,7 @@ func TestAllocateQuotaToTeam(t *testing.T) {
 // TestConsumeTeamQuota 测试团队额度消费
 func TestConsumeTeamQuota(t *testing.T) {
 	db := setupTestDB(t)
+	defer testutils.CleanupTestDB(t, db)
 	
 	// 创建测试用户
 	owner := createTestUser(db, t, "owner", 1000000)
@@ -140,6 +146,7 @@ func TestConsumeTeamQuota(t *testing.T) {
 // TestConsumeTeamQuotaWithMixedSource 测试混合额度消费
 func TestConsumeTeamQuotaWithMixedSource(t *testing.T) {
 	db := setupTestDB(t)
+	defer testutils.CleanupTestDB(t, db)
 	
 	// 创建测试用户
 	owner := createTestUser(db, t, "owner", 1000000)
@@ -172,6 +179,7 @@ func TestConsumeTeamQuotaWithMixedSource(t *testing.T) {
 // TestConsumeTeamQuotaWithMemberLimit 测试成员额度限制
 func TestConsumeTeamQuotaWithMemberLimit(t *testing.T) {
 	db := setupTestDB(t)
+	defer testutils.CleanupTestDB(t, db)
 	
 	// 创建测试用户
 	owner := createTestUser(db, t, "owner", 1000000)
@@ -198,6 +206,7 @@ func TestConsumeTeamQuotaWithMemberLimit(t *testing.T) {
 // TestConsumeTeamQuotaInsufficientUserQuota 测试用户个人额度不足
 func TestConsumeTeamQuotaInsufficientUserQuota(t *testing.T) {
 	db := setupTestDB(t)
+	defer testutils.CleanupTestDB(t, db)
 	
 	// 创建测试用户
 	owner := createTestUser(db, t, "owner", 1000000)
@@ -218,6 +227,7 @@ func TestConsumeTeamQuotaInsufficientUserQuota(t *testing.T) {
 // TestConsumeTeamQuotaUnlimitedTeam 测试无限额度团队
 func TestConsumeTeamQuotaUnlimitedTeam(t *testing.T) {
 	db := setupTestDB(t)
+	defer testutils.CleanupTestDB(t, db)
 	
 	// 创建测试用户
 	owner := createTestUser(db, t, "owner", 1000000)
@@ -247,6 +257,7 @@ func TestConsumeTeamQuotaUnlimitedTeam(t *testing.T) {
 // TestConcurrentTeamQuotaConsumption 测试并发团队额度消费
 func TestConcurrentTeamQuotaConsumption(t *testing.T) {
 	db := setupTestDB(t)
+	defer testutils.CleanupTestDB(t, db)
 	
 	// 创建测试用户
 	owner := createTestUser(db, t, "owner", 1000000)
@@ -299,6 +310,7 @@ func TestConcurrentTeamQuotaConsumption(t *testing.T) {
 // TestConcurrentQuotaAllocation 测试并发额度分配
 func TestConcurrentQuotaAllocation(t *testing.T) {
 	db := setupTestDB(t)
+	defer testutils.CleanupTestDB(t, db)
 	
 	// 创建测试用户（大额度）
 	owner := createTestUser(db, t, "owner", 10000000)
@@ -348,6 +360,7 @@ func TestConcurrentQuotaAllocation(t *testing.T) {
 // TestTeamQuotaEdgeCases 测试边界情况
 func TestTeamQuotaEdgeCases(t *testing.T) {
 	db := setupTestDB(t)
+	defer testutils.CleanupTestDB(t, db)
 	
 	// 创建测试用户
 	owner := createTestUser(db, t, "owner", 1000000)
@@ -400,6 +413,7 @@ func BenchmarkTeamQuotaConsumption(b *testing.B) {
 // TestGetEffectiveQuotaForContext 测试统一额度查询接口
 func TestGetEffectiveQuotaForContext(t *testing.T) {
 	db := setupTestDB(t)
+	defer testutils.CleanupTestDB(t, db)
 	
 	// 创建测试用户
 	owner := createTestUser(db, t, "owner", 1000000)
@@ -455,6 +469,7 @@ func TestGetEffectiveQuotaForContext(t *testing.T) {
 // TestTeamQuotaOperations 测试团队额度操作函数
 func TestTeamQuotaOperations(t *testing.T) {
 	db := setupTestDB(t)
+	defer testutils.CleanupTestDB(t, db)
 	
 	// 创建测试用户和团队
 	owner := createTestUser(db, t, "owner", 1000000)
@@ -496,6 +511,7 @@ func TestTeamQuotaOperations(t *testing.T) {
 // TestOwnerUsingTeamToken 测试 Owner 使用团队 Token 的场景
 func TestOwnerUsingTeamToken(t *testing.T) {
 	db := setupTestDB(t)
+	defer testutils.CleanupTestDB(t, db)
 	
 	// 创建测试用户
 	owner := createTestUser(db, t, "owner", 1000000)
@@ -507,7 +523,7 @@ func TestOwnerUsingTeamToken(t *testing.T) {
 	
 	// 模拟 Owner 使用团队 Token 消费
 	// 这里应该直接扣除 Owner 的个人额度，而不是团队额度
-	teamQuotaUsed, userQuotaUsed, err := model.ConsumeTeamQuota(owner.Id, team.Id, 100000)
+	_, _, err := model.ConsumeTeamQuota(owner.Id, team.Id, 100000)
 	assert.NoError(t, err)
 	
 	// 验证：Owner 使用团队 Token 时，应该扣除个人额度
@@ -528,6 +544,7 @@ func TestOwnerUsingTeamToken(t *testing.T) {
 // TestMemberUsingTeamToken 测试成员使用团队 Token 的场景
 func TestMemberUsingTeamToken(t *testing.T) {
 	db := setupTestDB(t)
+	defer testutils.CleanupTestDB(t, db)
 	
 	// 创建测试用户
 	owner := createTestUser(db, t, "owner", 1000000)
@@ -563,6 +580,7 @@ func TestMemberUsingTeamToken(t *testing.T) {
 // TestMemberUsingUnlimitedTeamToken 测试成员使用无限额度团队 Token 的场景
 func TestMemberUsingUnlimitedTeamToken(t *testing.T) {
 	db := setupTestDB(t)
+	defer testutils.CleanupTestDB(t, db)
 	
 	// 创建测试用户
 	owner := createTestUser(db, t, "owner", 1000000)
@@ -603,6 +621,7 @@ func TestMemberUsingUnlimitedTeamToken(t *testing.T) {
 // TestTeamQuotaExhausted 测试团队额度耗尽的情况
 func TestTeamQuotaExhausted(t *testing.T) {
 	db := setupTestDB(t)
+	defer testutils.CleanupTestDB(t, db)
 	
 	// 创建测试用户
 	owner := createTestUser(db, t, "owner", 1000000)

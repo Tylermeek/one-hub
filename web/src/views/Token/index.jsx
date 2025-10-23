@@ -113,8 +113,13 @@ export default function Token() {
 
   // 监听上下文切换事件，刷新 Token 列表
   useEffect(() => {
-    const handleContextChange = () => {
-      handleRefresh(); // 刷新 Token 列表
+    const handleContextChange = (event) => {
+      console.log('上下文切换事件触发:', event.detail);
+      // 重置分页和搜索条件
+      setPage(0);
+      setSearchKeyword('');
+      // 触发数据刷新
+      setRefreshFlag(prev => !prev);
     };
 
     window.addEventListener('contextChanged', handleContextChange);

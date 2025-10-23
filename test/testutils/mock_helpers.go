@@ -6,9 +6,10 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/stretchr/testify/mock"
+	"gorm.io/gorm"
 	"one-api/model"
 )
 
@@ -379,10 +380,9 @@ func (h *TestCleanupHelper) CleanupTestData(t *testing.T, db *gorm.DB) {
 
 // ResetMockExpectations 重置 Mock 期望
 func (h *TestCleanupHelper) ResetMockExpectations(mocks ...interface{}) {
-	for _, mock := range mocks {
-		if mockObj, ok := mock.(mock.TestingT); ok {
-			// 重置 Mock 对象的期望
-			// 这里需要根据具体的 Mock 类型来实现
-		}
+	for _, mockObj := range mocks {
+		// 重置 Mock 对象的期望
+		// 这里需要根据具体的 Mock 类型来实现
+		_ = mockObj
 	}
 }

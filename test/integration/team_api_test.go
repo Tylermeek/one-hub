@@ -3,6 +3,7 @@ package integration
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -12,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"gorm.io/gorm"
+	gormLogger "gorm.io/gorm/logger"
 
 	"one-api/controller"
 	"one-api/middleware"
@@ -29,7 +31,12 @@ type TeamAPISuite struct {
 
 // SetupSuite 测试套件初始化
 func (suite *TeamAPISuite) SetupSuite() {
-	suite.db = testutils.SetupTestDB(suite.T(), nil)
+	config := &testutils.TestConfig{
+		DBType:      "sqlite",
+		LogLevel:    gormLogger.Silent,
+		AutoMigrate: true,
+	}
+	suite.db = testutils.SetupTestDB(suite.T(), config)
 	suite.factory = testutils.NewTestDataFactory()
 	
 	// 设置 Gin 测试模式
@@ -37,8 +44,8 @@ func (suite *TeamAPISuite) SetupSuite() {
 	
 	// 创建路由
 	suite.router = gin.New()
-	suite.router.Use(middleware.Recover())
-	suite.router.Use(middleware.Logger())
+	suite.router.Use(middleware.RelayPanicRecover())
+	middleware.SetUpLogger(suite.router)
 	
 	// 设置 API 路由
 	apiRouter := suite.router.Group("/api")
@@ -80,6 +87,14 @@ func (suite *TeamAPISuite) setupAPIRoutes(apiRouter *gin.RouterGroup) {
 	
 	// 团队注册路由
 	apiRouter.POST("/team/register", controller.RegisterWithInvite)
+	
+	// 上下文管理路由
+	contextRoute := apiRouter.Group("/context")
+	contextRoute.Use(suite.mockAuthMiddleware())
+	{
+		contextRoute.POST("/switch", controller.SwitchContext)
+		contextRoute.GET("/current", controller.GetCurrentContext)
+	}
 }
 
 // mockAuthMiddleware 模拟认证中间件
@@ -102,6 +117,9 @@ func (suite *TeamAPISuite) mockAuthMiddleware() gin.HandlerFunc {
 		}
 		
 		c.Set("id", userId)
+		c.Set("username", "testuser")
+		c.Set("role", 1)
+		c.Set("status", 1)
 		c.Next()
 	}
 }
@@ -111,7 +129,7 @@ func (suite *TeamAPISuite) TestCreateTeamAPI() {
 	// 创建测试用户
 	userFactory := suite.factory.NewUserFactory()
 	owner := userFactory.CreateUserWithQuota(1000000)
-	err := suite.db.Create(owner).Error
+	err := owner.Insert(0)
 	require.NoError(suite.T(), err)
 	
 	// 准备请求数据
@@ -162,7 +180,7 @@ func (suite *TeamAPISuite) TestGetUserTeamsAPI() {
 	teamFactory := suite.factory.NewTeamFactory()
 	
 	owner := userFactory.CreateUserWithQuota(1000000)
-	err := suite.db.Create(owner).Error
+	err := owner.Insert(0)
 	require.NoError(suite.T(), err)
 	
 	team := teamFactory.CreateTeam(owner.Id)
@@ -188,7 +206,7 @@ func (suite *TeamAPISuite) TestGetTeamDetailAPI() {
 	teamFactory := suite.factory.NewTeamFactory()
 	
 	owner := userFactory.CreateUserWithQuota(1000000)
-	err := suite.db.Create(owner).Error
+	err := owner.Insert(0)
 	require.NoError(suite.T(), err)
 	
 	team := teamFactory.CreateTeam(owner.Id)
@@ -196,7 +214,7 @@ func (suite *TeamAPISuite) TestGetTeamDetailAPI() {
 	require.NoError(suite.T(), err)
 	
 	// 准备请求
-	req, _ := http.NewRequest("GET", "/api/team/1", nil)
+	req, _ := http.NewRequest("GET", fmt.Sprintf("/api/team/%d", team.Id), nil)
 	req.Header.Set("X-User-ID", "1")
 	
 	w := httptest.NewRecorder()
@@ -215,9 +233,9 @@ func (suite *TeamAPISuite) TestGetTeamDetailAPIPermissionDenied() {
 	
 	owner := userFactory.CreateUserWithQuota(1000000)
 	nonMember := userFactory.CreateUserWithQuota(200000)
-	err := suite.db.Create(owner).Error
+	err := owner.Insert(0)
 	require.NoError(suite.T(), err)
-	err = suite.db.Create(nonMember).Error
+	err = nonMember.Insert(0)
 	require.NoError(suite.T(), err)
 	
 	team := teamFactory.CreateTeam(owner.Id)
@@ -225,7 +243,7 @@ func (suite *TeamAPISuite) TestGetTeamDetailAPIPermissionDenied() {
 	require.NoError(suite.T(), err)
 	
 	// 准备请求（非团队成员访问）
-	req, _ := http.NewRequest("GET", "/api/team/1", nil)
+	req, _ := http.NewRequest("GET", fmt.Sprintf("/api/team/%d", team.Id), nil)
 	req.Header.Set("X-User-ID", "2") // 非团队成员
 	
 	w := httptest.NewRecorder()
@@ -243,7 +261,7 @@ func (suite *TeamAPISuite) TestAllocateTeamQuotaAPI() {
 	teamFactory := suite.factory.NewTeamFactory()
 	
 	owner := userFactory.CreateUserWithQuota(1000000)
-	err := suite.db.Create(owner).Error
+	err := owner.Insert(0)
 	require.NoError(suite.T(), err)
 	
 	team := teamFactory.CreateTeamWithQuota(owner.Id, 0)
@@ -257,7 +275,7 @@ func (suite *TeamAPISuite) TestAllocateTeamQuotaAPI() {
 	}
 	
 	jsonData, _ := json.Marshal(quotaData)
-	req, _ := http.NewRequest("POST", "/api/team/1/allocate", bytes.NewBuffer(jsonData))
+	req, _ := http.NewRequest("POST", fmt.Sprintf("/api/team/%d/allocate", team.Id), bytes.NewBuffer(jsonData))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("X-User-ID", "1")
 	
@@ -283,9 +301,9 @@ func (suite *TeamAPISuite) TestAllocateTeamQuotaAPIPermissionDenied() {
 	
 	owner := userFactory.CreateUserWithQuota(1000000)
 	member := userFactory.CreateUserWithQuota(200000)
-	err := suite.db.Create(owner).Error
+	err := owner.Insert(0)
 	require.NoError(suite.T(), err)
-	err = suite.db.Create(member).Error
+	err = member.Insert(0)
 	require.NoError(suite.T(), err)
 	
 	team := teamFactory.CreateTeam(owner.Id)
@@ -304,7 +322,7 @@ func (suite *TeamAPISuite) TestAllocateTeamQuotaAPIPermissionDenied() {
 	}
 	
 	jsonData, _ := json.Marshal(quotaData)
-	req, _ := http.NewRequest("POST", "/api/team/1/allocate", bytes.NewBuffer(jsonData))
+	req, _ := http.NewRequest("POST", fmt.Sprintf("/api/team/%d/allocate", team.Id), bytes.NewBuffer(jsonData))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("X-User-ID", "2") // 普通成员
 	
@@ -324,9 +342,9 @@ func (suite *TeamAPISuite) TestInviteMemberAPI() {
 	
 	owner := userFactory.CreateUserWithQuota(1000000)
 	member := userFactory.CreateUserWithQuota(200000)
-	err := suite.db.Create(owner).Error
+	err := owner.Insert(0)
 	require.NoError(suite.T(), err)
-	err = suite.db.Create(member).Error
+	err = member.Insert(0)
 	require.NoError(suite.T(), err)
 	
 	team := teamFactory.CreateTeam(owner.Id)
@@ -339,7 +357,7 @@ func (suite *TeamAPISuite) TestInviteMemberAPI() {
 	}
 	
 	jsonData, _ := json.Marshal(inviteData)
-	req, _ := http.NewRequest("POST", "/api/team/1/invite", bytes.NewBuffer(jsonData))
+	req, _ := http.NewRequest("POST", fmt.Sprintf("/api/team/%d/invite", team.Id), bytes.NewBuffer(jsonData))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("X-User-ID", "1")
 	
@@ -362,9 +380,9 @@ func (suite *TeamAPISuite) TestGetTeamMembersAPI() {
 	
 	owner := userFactory.CreateUserWithQuota(1000000)
 	member := userFactory.CreateUserWithQuota(200000)
-	err := suite.db.Create(owner).Error
+	err := owner.Insert(0)
 	require.NoError(suite.T(), err)
-	err = suite.db.Create(member).Error
+	err = member.Insert(0)
 	require.NoError(suite.T(), err)
 	
 	team := teamFactory.CreateTeam(owner.Id)
@@ -377,7 +395,7 @@ func (suite *TeamAPISuite) TestGetTeamMembersAPI() {
 	require.NoError(suite.T(), err)
 	
 	// 准备请求
-	req, _ := http.NewRequest("GET", "/api/team/1/members?page=1&size=10", nil)
+	req, _ := http.NewRequest("GET", fmt.Sprintf("/api/team/%d/members?page=1&size=10", team.Id), nil)
 	req.Header.Set("X-User-ID", "1")
 	
 	w := httptest.NewRecorder()
@@ -397,9 +415,9 @@ func (suite *TeamAPISuite) TestUpdateMemberQuotaAPI() {
 	
 	owner := userFactory.CreateUserWithQuota(1000000)
 	member := userFactory.CreateUserWithQuota(200000)
-	err := suite.db.Create(owner).Error
+	err := owner.Insert(0)
 	require.NoError(suite.T(), err)
-	err = suite.db.Create(member).Error
+	err = member.Insert(0)
 	require.NoError(suite.T(), err)
 	
 	team := teamFactory.CreateTeam(owner.Id)
@@ -417,7 +435,7 @@ func (suite *TeamAPISuite) TestUpdateMemberQuotaAPI() {
 	}
 	
 	jsonData, _ := json.Marshal(quotaData)
-	req, _ := http.NewRequest("PUT", "/api/team/1/member/2/quota", bytes.NewBuffer(jsonData))
+	req, _ := http.NewRequest("PUT", fmt.Sprintf("/api/team/%d/member/%d/quota", team.Id, member.Id), bytes.NewBuffer(jsonData))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("X-User-ID", "1")
 	
@@ -443,9 +461,9 @@ func (suite *TeamAPISuite) TestRemoveMemberAPI() {
 	
 	owner := userFactory.CreateUserWithQuota(1000000)
 	member := userFactory.CreateUserWithQuota(200000)
-	err := suite.db.Create(owner).Error
+	err := owner.Insert(0)
 	require.NoError(suite.T(), err)
-	err = suite.db.Create(member).Error
+	err = member.Insert(0)
 	require.NoError(suite.T(), err)
 	
 	team := teamFactory.CreateTeam(owner.Id)
@@ -458,7 +476,7 @@ func (suite *TeamAPISuite) TestRemoveMemberAPI() {
 	require.NoError(suite.T(), err)
 	
 	// 准备请求
-	req, _ := http.NewRequest("DELETE", "/api/team/1/member/2", nil)
+	req, _ := http.NewRequest("DELETE", fmt.Sprintf("/api/team/%d/member/%d", team.Id, member.Id), nil)
 	req.Header.Set("X-User-ID", "1")
 	
 	w := httptest.NewRecorder()
@@ -478,7 +496,7 @@ func (suite *TeamAPISuite) TestDeleteTeamAPI() {
 	teamFactory := suite.factory.NewTeamFactory()
 	
 	owner := userFactory.CreateUserWithQuota(1000000)
-	err := suite.db.Create(owner).Error
+	err := owner.Insert(0)
 	require.NoError(suite.T(), err)
 	
 	team := teamFactory.CreateTeamWithQuota(owner.Id, 100000)
@@ -486,7 +504,7 @@ func (suite *TeamAPISuite) TestDeleteTeamAPI() {
 	require.NoError(suite.T(), err)
 	
 	// 准备请求
-	req, _ := http.NewRequest("DELETE", "/api/team/1", nil)
+	req, _ := http.NewRequest("DELETE", fmt.Sprintf("/api/team/%d", team.Id), nil)
 	req.Header.Set("X-User-ID", "1")
 	
 	w := httptest.NewRecorder()
@@ -506,7 +524,7 @@ func (suite *TeamAPISuite) TestRegisterWithInviteAPI() {
 	teamFactory := suite.factory.NewTeamFactory()
 	
 	owner := userFactory.CreateUserWithQuota(1000000)
-	err := suite.db.Create(owner).Error
+	err := owner.Insert(0)
 	require.NoError(suite.T(), err)
 	
 	team := teamFactory.CreateTeam(owner.Id)
@@ -539,6 +557,156 @@ func (suite *TeamAPISuite) TestRegisterWithInviteAPI() {
 	err = suite.db.Where("username = ?", "newuser").First(&newUser).Error
 	require.NoError(suite.T(), err)
 	testutils.AssertDatabaseRecordExists(suite.T(), suite.db, &model.TeamMember{}, "team_id = ? AND user_id = ?", team.Id, newUser.Id)
+}
+
+// TestContextSwitchingAPI 测试上下文切换 API
+func (suite *TeamAPISuite) TestContextSwitchingAPI() {
+	// 创建测试用户
+	userFactory := suite.factory.NewUserFactory()
+	user := userFactory.Create(suite.T(), suite.db, testutils.UserData{
+		Username: "testuser",
+		Password: "password",
+		Quota:    1000000,
+	})
+	
+	// 创建测试团队
+	teamFactory := suite.factory.NewTeamFactory()
+	team := teamFactory.Create(suite.T(), suite.db, testutils.TeamData{
+		Name:    "测试团队",
+		OwnerId: user.Id,
+		Quota:   100000,
+	})
+	
+	// 添加用户为团队成员
+	memberFactory := suite.factory.NewTeamMemberFactory()
+	memberFactory.Create(suite.T(), suite.db, testutils.TeamMemberData{
+		TeamId: team.Id,
+		UserId: user.Id,
+		Role:   1, // 管理员
+		Status: 1,
+	})
+	
+	suite.Run("测试切换到团队空间", func() {
+		reqBody := map[string]interface{}{
+			"type": "team",
+			"id":   team.Id,
+		}
+		jsonData, _ := json.Marshal(reqBody)
+		
+		req, _ := http.NewRequest("POST", "/api/context/switch", bytes.NewBuffer(jsonData))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("X-User-ID", "1")
+		
+		w := httptest.NewRecorder()
+		suite.router.ServeHTTP(w, req)
+		
+		// 验证响应
+		suite.Equal(http.StatusOK, w.Code)
+		
+		var response map[string]interface{}
+		err := json.Unmarshal(w.Body.Bytes(), &response)
+		suite.NoError(err)
+		
+		suite.True(response["success"].(bool))
+		suite.Equal("空间切换成功", response["message"].(string))
+		
+		data := response["data"].(map[string]interface{})
+		suite.Equal("team", data["type"])
+		suite.Equal(float64(team.Id), data["id"])
+	})
+	
+	suite.Run("测试切换到用户空间", func() {
+		reqBody := map[string]interface{}{
+			"type": "user",
+			"id":   user.Id,
+		}
+		jsonData, _ := json.Marshal(reqBody)
+		
+		req, _ := http.NewRequest("POST", "/api/context/switch", bytes.NewBuffer(jsonData))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("X-User-ID", "1")
+		
+		w := httptest.NewRecorder()
+		suite.router.ServeHTTP(w, req)
+		
+		// 验证响应
+		suite.Equal(http.StatusOK, w.Code)
+		
+		var response map[string]interface{}
+		err := json.Unmarshal(w.Body.Bytes(), &response)
+		suite.NoError(err)
+		
+		suite.True(response["success"].(bool))
+		suite.Equal("空间切换成功", response["message"].(string))
+		
+		data := response["data"].(map[string]interface{})
+		suite.Equal("user", data["type"])
+		suite.Equal(float64(user.Id), data["id"])
+	})
+	
+	suite.Run("测试越权访问团队空间", func() {
+		// 创建另一个用户
+		otherUser := userFactory.Create(suite.T(), suite.db, testutils.UserData{
+			Username: "otheruser",
+			Password: "password",
+			Quota:    100000,
+		})
+		
+		reqBody := map[string]interface{}{
+			"type": "team",
+			"id":   team.Id,
+		}
+		jsonData, _ := json.Marshal(reqBody)
+		
+		req, _ := http.NewRequest("POST", "/api/context/switch", bytes.NewBuffer(jsonData))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("X-User-ID", "2") // 使用另一个用户的ID
+		
+		w := httptest.NewRecorder()
+		suite.router.ServeHTTP(w, req)
+		
+		// 验证响应
+		suite.Equal(http.StatusOK, w.Code)
+		
+		var response map[string]interface{}
+		err := json.Unmarshal(w.Body.Bytes(), &response)
+		suite.NoError(err)
+		
+		suite.False(response["success"].(bool))
+		suite.Contains(response["message"].(string), "无权限访问该团队空间")
+	})
+}
+
+// TestGetCurrentContextAPI 测试获取当前上下文 API
+func (suite *TeamAPISuite) TestGetCurrentContextAPI() {
+	// 创建测试用户
+	userFactory := suite.factory.NewUserFactory()
+	user := userFactory.Create(suite.T(), suite.db, testutils.UserData{
+		Username: "testuser",
+		Password: "password",
+		Quota:    1000000,
+	})
+	
+	suite.Run("测试获取默认用户空间", func() {
+		req, _ := http.NewRequest("GET", "/api/context/current", nil)
+		req.Header.Set("X-User-ID", "1")
+		
+		w := httptest.NewRecorder()
+		suite.router.ServeHTTP(w, req)
+		
+		// 验证响应
+		suite.Equal(http.StatusOK, w.Code)
+		
+		var response map[string]interface{}
+		err := json.Unmarshal(w.Body.Bytes(), &response)
+		suite.NoError(err)
+		
+		suite.True(response["success"].(bool))
+		
+		data := response["data"].(map[string]interface{})
+		suite.Equal("user", data["type"])
+		suite.Equal(float64(user.Id), data["id"])
+	})
 }
 
 // TestTeamAPISuite 运行测试套件

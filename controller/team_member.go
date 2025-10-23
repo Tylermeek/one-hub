@@ -51,11 +51,16 @@ func SearchUsers(c *gin.Context) {
 		return
 	}
 
-	// 过滤掉当前用户
-	var filteredUsers []*model.User
+	// 🔐 过滤敏感信息，仅返回必要字段
+	var filteredUsers []gin.H
 	for _, user := range *users.Data {
 		if user.Id != userId {
-			filteredUsers = append(filteredUsers, user)
+			filteredUsers = append(filteredUsers, gin.H{
+				"id":           user.Id,
+				"username":     user.Username,
+				"display_name": user.DisplayName,
+				// 不返回 email, quota 等敏感信息
+			})
 		}
 	}
 

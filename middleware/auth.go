@@ -136,9 +136,19 @@ func tokenAuth(c *gin.Context, key string) {
 	c.Set("token_group", token.Group)
 	c.Set("token_backup_group", token.BackupGroup)
 	c.Set("token_setting", utils.GetPointer(token.Setting.Data()))
-	// 设置 Token 的上下文信息
+	
+	// 🔐 Token 自动设置空间上下文
 	c.Set("context_type", token.OwnerType)
 	c.Set("context_id", token.OwnerId)
+	
+	// 验证用户是否仍有权限访问该空间
+	if token.OwnerType == "team" {
+		if !model.IsTeamOwner(token.OwnerId, token.UserId) && 
+		   !model.IsTeamMember(token.OwnerId, token.UserId) {
+			abortWithMessage(c, http.StatusForbidden, "Token 所属空间权限已失效")
+			return
+		}
+	}
 	if err := checkLimitIP(c); err != nil {
 		abortWithMessage(c, http.StatusForbidden, err.Error())
 		return

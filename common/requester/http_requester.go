@@ -307,17 +307,6 @@ func logRequestDetails(req *http.Request) {
 			headers = append(headers, fmt.Sprintf("%s: %s", name, value))
 		}
 	}
-
-	// 记录请求信息
-	logger.SysDebug(fmt.Sprintf("发送HTTP请求到上游API:\n"+
-		"URL: %s\n"+
-		"Method: %s\n"+
-		"Headers: %s\n"+
-		"Body: %s",
-		req.URL.String(),
-		req.Method,
-		strings.Join(headers, "\n"),
-		string(bodyBytes)))
 }
 
 // logRequestError 记录请求失败时的详细信息
@@ -337,17 +326,4 @@ func logRequestError(req *http.Request, err error) {
 			headers = append(headers, fmt.Sprintf("%s: %s", name, value))
 		}
 	}
-
-	// 记录错误信息
-	logger.SysError(fmt.Sprintf("HTTP请求失败:\n"+
-		"URL: %s\n"+
-		"Method: %s\n"+
-		"Headers: %s\n"+
-		"Body: %s\n"+
-		"Error: %v",
-		req.URL.String(),
-		req.Method,
-		strings.Join(headers, "\n"),
-		string(bodyBytes),
-		err))
 }

@@ -70,15 +70,26 @@ const Dashboard = () => {
 
       // 处理 Dashboard 数据
       const { success: dashboardSuccess, message: dashboardMessage, data: dashboardData } = dashboardRes.data;
-      if (dashboardSuccess && dashboardData) {
-        setDashboardData(dashboardData);
-        let lineData = getLineDataGroup(dashboardData);
-        setRequestChart(getLineCardOption(lineData, 'RequestCount'));
-        setQuotaChart(getLineCardOption(lineData, 'Quota'));
-        setTokenChart(getLineCardOption(lineData, 'PromptTokens'));
-        setStatisticalData(getBarDataGroup(dashboardData));
-        setModelUsageData(getModelUsageData(dashboardData));
-      } else if (!dashboardSuccess) {
+      if (dashboardSuccess) {
+        if (dashboardData) {
+          // 有数据时正常处理
+          setDashboardData(dashboardData);
+          let lineData = getLineDataGroup(dashboardData);
+          setRequestChart(getLineCardOption(lineData, 'RequestCount'));
+          setQuotaChart(getLineCardOption(lineData, 'Quota'));
+          setTokenChart(getLineCardOption(lineData, 'PromptTokens'));
+          setStatisticalData(getBarDataGroup(dashboardData));
+          setModelUsageData(getModelUsageData(dashboardData));
+        } else {
+          // 无数据时清空所有图表数据
+          setDashboardData(null);
+          setRequestChart(null);
+          setQuotaChart(null);
+          setTokenChart(null);
+          setStatisticalData(null);
+          setModelUsageData([]);
+        }
+      } else {
         showError(dashboardMessage);
       }
 

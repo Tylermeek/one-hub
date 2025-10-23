@@ -229,17 +229,6 @@ export default function Log() {
     }
   }, [userIsAdmin]);
 
-  // 监听上下文切换事件，刷新日志列表
-  useEffect(() => {
-    const handleContextChange = () => {
-      handleRefresh(); // 刷新日志列表以显示当前上下文的消费记录
-    };
-
-    window.addEventListener('contextChanged', handleContextChange);
-    return () => {
-      window.removeEventListener('contextChanged', handleContextChange);
-    };
-  }, []);
 
   return (
     <>

@@ -226,6 +226,49 @@ func GetTokenByIds(id int, userId int) (*Token, error) {
 	return &token, err
 }
 
+// GetTokenByIdsWithContext 带上下文权限校验的Token查询
+func GetTokenByIdsWithContext(id int, userId int, contextType string, contextId int) (*Token, error) {
+	// 添加日志记录参数
+	logger.SysLog(fmt.Sprintf("GetTokenByIdsWithContext called with params: id=%d, userId=%d, contextType=%s, contextId=%d", 
+		id, userId, contextType, contextId))
+	
+	if id == 0 || userId == 0 {
+		return nil, errors.New("id 或 userId 为空！")
+	}
+	
+	// 先查询Token是否存在
+	var token Token
+	err := DB.Where("id = ? AND user_id = ?", id, userId).First(&token).Error
+	if err != nil {
+		return nil, err
+	}
+	
+	// 🔐 权限校验：确保用户有权限访问该空间下的Token
+	if token.OwnerType == "team" {
+		// 团队空间的Token：检查用户是否为团队成员
+		if !IsTeamMember(token.OwnerId, userId) {
+			return nil, errors.New("无权限访问该团队空间下的Token")
+		}
+		// 确保当前上下文是团队空间
+		if contextType != "team" || contextId != token.OwnerId {
+			return nil, errors.New("当前不在正确的团队空间中")
+		}
+	} else if token.OwnerType == "user" {
+		// 个人空间的Token：只能访问自己的Token
+		if token.OwnerId != userId {
+			return nil, errors.New("无权限访问其他用户的Token")
+		}
+		// 确保当前上下文是个人空间
+		if contextType != "user" || contextId != userId {
+			return nil, errors.New("当前不在正确的个人空间中")
+		}
+	} else {
+		return nil, errors.New("无效的Token空间类型")
+	}
+	
+	return &token, nil
+}
+
 func GetTokenById(id int) (*Token, error) {
 	if id == 0 {
 		return nil, errors.New("id 为空！")
@@ -265,9 +308,25 @@ func (token *Token) Insert() error {
 
 // InsertWithContext 创建 Token 并绑定到指定上下文
 func (token *Token) InsertWithContext(contextType string, contextId int) error {
+	// 🔐 权限验证
+	if contextType == "team" {
+		if !IsTeamOwner(contextId, token.UserId) && !IsTeamMember(contextId, token.UserId) {
+			return errors.New("无权限在该团队空间创建 Token")
+		}
+	} else if contextType == "user" {
+		if contextId != token.UserId {
+			return errors.New("无权限为其他用户创建 Token")
+		}
+	} else {
+		return errors.New("无效的空间类型")
+	}
+	
 	token.OwnerType = contextType
 	token.OwnerId = contextId
-	return token.Insert()
+	token.CreatedTime = utils.GetTimestamp()
+	token.AccessedTime = token.CreatedTime
+	
+	return DB.Create(token).Error
 }
 
 // Update Make sure your token's fields is completed, because this will update non-zero values
@@ -296,11 +355,15 @@ func DeleteTokenById(id int, userId int) (err error) {
 	if id == 0 || userId == 0 {
 		return errors.New("id 或 userId 为空！")
 	}
-	token := Token{Id: id, UserId: userId}
-	err = DB.Where(token).First(&token).Error
+	
+	// 先查询Token是否存在，并获取其上下文信息
+	var token Token
+	err = DB.Where("id = ? AND user_id = ?", id, userId).First(&token).Error
 	if err != nil {
 		return err
 	}
+	
+	// 删除Token
 	err = token.Delete()
 
 	if err == nil && config.RedisEnabled {
@@ -309,6 +372,56 @@ func DeleteTokenById(id int, userId int) (err error) {
 
 	return err
 
+}
+
+// DeleteTokenByIdWithContext 带上下文权限校验的Token删除
+func DeleteTokenByIdWithContext(id int, userId int, contextType string, contextId int) (err error) {
+	// 添加日志记录参数
+	logger.SysLog(fmt.Sprintf("DeleteTokenByIdWithContext called with params: id=%d, userId=%d, contextType=%s, contextId=%d", 
+		id, userId, contextType, contextId))
+
+	if id == 0 || userId == 0 {
+		return errors.New("id 或 userId 为空！")
+	}
+	
+	// 先查询Token是否存在
+	var token Token
+	err = DB.Where("id = ? AND user_id = ?", id, userId).First(&token).Error
+	if err != nil {
+		return err
+	}
+	
+	// 🔐 权限校验：确保用户有权限删除该空间下的Token
+	if token.OwnerType == "team" {
+		// 团队空间的Token：检查用户是否为团队成员
+		if !IsTeamMember(token.OwnerId, userId) {
+			return errors.New("无权限删除该团队空间下的Token")
+		}
+		// 确保当前上下文是团队空间
+		if contextType != "team" || contextId != token.OwnerId {
+			return errors.New("当前不在正确的团队空间中")
+		}
+	} else if token.OwnerType == "user" {
+		// 个人空间的Token：只能删除自己的Token
+		if token.OwnerId != userId {
+			return errors.New("无权限删除其他用户的Token")
+		}
+		// 确保当前上下文是个人空间
+		if contextType != "user" || contextId != userId {
+			return errors.New("当前不在正确的个人空间中")
+		}
+	} else {
+		return errors.New("无效的Token空间类型")
+	}
+	
+	// 删除Token
+	err = token.Delete()
+
+	if err == nil && config.RedisEnabled {
+		redis.RedisDel(fmt.Sprintf(UserTokensKey, token.Key))
+	}
+
+	return err
 }
 
 func IncreaseTokenQuota(id int, quota int) (err error) {

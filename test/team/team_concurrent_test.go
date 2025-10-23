@@ -9,15 +9,21 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
+	gormLogger "gorm.io/gorm/logger"
 
-	"one-hub/model"
+	"one-api/model"
+	"one-api/test/testutils"
 )
 
 // TestConcurrentTeamOperations 测试并发团队操作
 func TestConcurrentTeamOperations(t *testing.T) {
-	db := setupTestDB(t)
+	config := &testutils.TestConfig{
+		DBType:      "sqlite",
+		LogLevel:    gormLogger.Silent,
+		AutoMigrate: true,
+	}
+	db := testutils.SetupTestDB(t, config)
 	
 	// 创建测试用户
 	owner := createTestUser(db, t, "owner", 10000000)
@@ -64,7 +70,12 @@ func TestConcurrentTeamOperations(t *testing.T) {
 
 // TestConcurrentMemberOperations 测试并发成员操作
 func TestConcurrentMemberOperations(t *testing.T) {
-	db := setupTestDB(t)
+	config := &testutils.TestConfig{
+		DBType:      "sqlite",
+		LogLevel:    gormLogger.Silent,
+		AutoMigrate: true,
+	}
+	db := testutils.SetupTestDB(t, config)
 	
 	// 创建测试用户
 	owner := createTestUser(db, t, "owner", 1000000)
@@ -98,7 +109,7 @@ func TestConcurrentMemberOperations(t *testing.T) {
 				Status:     1,
 				JoinedTime: time.Now().Unix(),
 			}
-			err := db.Create(memberRecord).Error
+			err := memberRecord.Insert()
 			results <- err
 		}(members[i])
 	}
@@ -126,7 +137,12 @@ func TestConcurrentMemberOperations(t *testing.T) {
 
 // TestConcurrentQuotaConsumption 测试并发额度消费
 func TestConcurrentQuotaConsumption(t *testing.T) {
-	db := setupTestDB(t)
+	config := &testutils.TestConfig{
+		DBType:      "sqlite",
+		LogLevel:    gormLogger.Silent,
+		AutoMigrate: true,
+	}
+	db := testutils.SetupTestDB(t, config)
 	
 	// 创建测试用户
 	owner := createTestUser(db, t, "owner", 1000000)
@@ -186,7 +202,12 @@ func TestConcurrentQuotaConsumption(t *testing.T) {
 
 // TestConcurrentMixedOperations 测试混合并发操作
 func TestConcurrentMixedOperations(t *testing.T) {
-	db := setupTestDB(t)
+	config := &testutils.TestConfig{
+		DBType:      "sqlite",
+		LogLevel:    gormLogger.Silent,
+		AutoMigrate: true,
+	}
+	db := testutils.SetupTestDB(t, config)
 	
 	// 创建测试用户
 	owner := createTestUser(db, t, "owner", 10000000)
@@ -250,7 +271,12 @@ func TestConcurrentMixedOperations(t *testing.T) {
 
 // TestConcurrentWithContext 测试带上下文的并发操作
 func TestConcurrentWithContext(t *testing.T) {
-	db := setupTestDB(t)
+	config := &testutils.TestConfig{
+		DBType:      "sqlite",
+		LogLevel:    gormLogger.Silent,
+		AutoMigrate: true,
+	}
+	db := testutils.SetupTestDB(t, config)
 	
 	// 创建测试用户
 	owner := createTestUser(db, t, "owner", 1000000)
@@ -306,7 +332,12 @@ func TestConcurrentWithContext(t *testing.T) {
 
 // TestConcurrentDeadlockPrevention 测试死锁预防
 func TestConcurrentDeadlockPrevention(t *testing.T) {
-	db := setupTestDB(t)
+	config := &testutils.TestConfig{
+		DBType:      "sqlite",
+		LogLevel:    gormLogger.Silent,
+		AutoMigrate: true,
+	}
+	db := testutils.SetupTestDB(t, config)
 	
 	// 创建测试用户
 	owner := createTestUser(db, t, "owner", 1000000)
@@ -361,7 +392,12 @@ func TestConcurrentDeadlockPrevention(t *testing.T) {
 
 // TestConcurrentErrorHandling 测试并发错误处理
 func TestConcurrentErrorHandling(t *testing.T) {
-	db := setupTestDB(t)
+	config := &testutils.TestConfig{
+		DBType:      "sqlite",
+		LogLevel:    gormLogger.Silent,
+		AutoMigrate: true,
+	}
+	db := testutils.SetupTestDB(t, config)
 	
 	// 创建测试用户
 	owner := createTestUser(db, t, "owner", 100000)
@@ -413,7 +449,7 @@ func TestConcurrentErrorHandling(t *testing.T) {
 
 // BenchmarkConcurrentQuotaConsumption 并发额度消费性能测试
 func BenchmarkConcurrentQuotaConsumption(b *testing.B) {
-	db := setupTestDB(&testing.T{})
+	db := testutils.SetupTestDB(&testing.T{}, nil)
 	
 	// 创建测试数据
 	owner := createTestUser(db, &testing.T{}, "owner", 100000000)
@@ -432,7 +468,7 @@ func BenchmarkConcurrentQuotaConsumption(b *testing.B) {
 
 // BenchmarkConcurrentQuotaAllocation 并发额度分配性能测试
 func BenchmarkConcurrentQuotaAllocation(b *testing.B) {
-	db := setupTestDB(&testing.T{})
+	db := testutils.SetupTestDB(&testing.T{}, nil)
 	
 	// 创建测试数据
 	owner := createTestUser(db, &testing.T{}, "owner", 100000000)

@@ -19,13 +19,8 @@ func GetChannelsList(c *gin.Context) {
 		return
 	}
 
-	// 获取上下文信息
-	userId := c.GetInt("id")
-	contextType := c.GetString("context_type")
-	contextId := c.GetInt("context_id")
-
-	// 使用上下文相关的查询方法
-	channels, err := model.GetChannelsByContext(contextType, contextId, userId, &params)
+	// 使用全局查询方法，不区分空间
+	channels, err := model.GetChannelsList(&params)
 	if err != nil {
 		common.APIRespondWithError(c, http.StatusOK, err)
 		return
@@ -72,10 +67,6 @@ func AddChannel(c *gin.Context) {
 		return
 	}
 
-	// 获取上下文信息
-	contextType := c.GetString("context_type")
-	contextId := c.GetInt("context_id")
-
 	channel.CreatedTime = utils.GetTimestamp()
 	keys := strings.Split(channel.Key, "\n")
 
@@ -99,10 +90,6 @@ func AddChannel(c *gin.Context) {
 		} else if len(baseUrls) > 0 {
 			localChannel.BaseURL = &baseUrls[0]
 		}
-
-		// 绑定上下文
-		localChannel.OwnerType = contextType
-		localChannel.OwnerId = contextId
 
 		channels = append(channels, localChannel)
 	}

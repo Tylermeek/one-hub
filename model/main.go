@@ -20,6 +20,11 @@ import (
 
 var DB *gorm.DB
 
+// SetDB 设置数据库实例（用于测试）
+func SetDB(db *gorm.DB) {
+	DB = db
+}
+
 func SetupDB() {
 	err := InitDB()
 	if err != nil {

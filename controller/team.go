@@ -147,10 +147,12 @@ func GetTeam(c *gin.Context) {
 		return
 	}
 
-	// 添加owner余额信息
-	owner, err := model.GetUserById(team.OwnerId, false)
-	if err == nil {
-		team.OwnerBalance = owner.Quota
+	// 🔐 仅 Owner 可以看到个人余额
+	if model.IsTeamOwner(id, userId) {
+		owner, err := model.GetUserById(team.OwnerId, false)
+		if err == nil {
+			team.OwnerBalance = owner.Quota
+		}
 	}
 
 	c.JSON(http.StatusOK, gin.H{

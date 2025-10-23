@@ -39,6 +39,9 @@ func GetUserTokensList(c *gin.Context) {
 func GetToken(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	userId := c.GetInt("id")
+	contextType := c.GetString("context_type")
+	contextId := c.GetInt("context_id")
+	
 	if err != nil {
 		c.JSON(http.StatusOK, gin.H{
 			"success": false,
@@ -46,7 +49,8 @@ func GetToken(c *gin.Context) {
 		})
 		return
 	}
-	token, err := model.GetTokenByIds(id, userId)
+	
+	token, err := model.GetTokenByIdsWithContext(id, userId, contextType, contextId)
 	if err != nil {
 		c.JSON(http.StatusOK, gin.H{
 			"success": false,
@@ -176,7 +180,10 @@ func AddToken(c *gin.Context) {
 func DeleteToken(c *gin.Context) {
 	id, _ := strconv.Atoi(c.Param("id"))
 	userId := c.GetInt("id")
-	err := model.DeleteTokenById(id, userId)
+	contextType := c.GetString("context_type")
+	contextId := c.GetInt("context_id")
+	
+	err := model.DeleteTokenByIdWithContext(id, userId, contextType, contextId)
 	if err != nil {
 		c.JSON(http.StatusOK, gin.H{
 			"success": false,
@@ -192,6 +199,8 @@ func DeleteToken(c *gin.Context) {
 
 func UpdateToken(c *gin.Context) {
 	userId := c.GetInt("id")
+	contextType := c.GetString("context_type")
+	contextId := c.GetInt("context_id")
 	statusOnly := c.Query("status_only")
 	token := model.Token{}
 	err := c.ShouldBindJSON(&token)
@@ -217,7 +226,7 @@ func UpdateToken(c *gin.Context) {
 		return
 	}
 
-	cleanToken, err := model.GetTokenByIds(token.Id, userId)
+	cleanToken, err := model.GetTokenByIdsWithContext(token.Id, userId, contextType, contextId)
 	if err != nil {
 		c.JSON(http.StatusOK, gin.H{
 			"success": false,

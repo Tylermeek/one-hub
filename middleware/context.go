@@ -1,38 +1,48 @@
 package middleware
 
 import (
-	"strconv"
+	"one-api/model"
 
+	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
 )
 
-// ContextMiddleware 解析请求头中的上下文信息并注入到 gin.Context
+// ContextMiddleware 从 Session 读取上下文信息并注入到 gin.Context
 func ContextMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// 从请求头获取上下文信息
-		contextType := c.GetHeader("X-Context-Type") // "user" or "team"
-		contextIdStr := c.GetHeader("X-Context-Id")  // id
+		userId := c.GetInt("id")
+		session := sessions.Default(c)
 
-		// 如果没有传递上下文信息，默认为用户上下文
-		if contextType == "" {
+		// 优先从 Session 读取上下文
+		contextType := session.Get("context_type")
+		contextId := session.Get("context_id")
+
+		// 如果 Session 中没有，默认为用户空间
+		if contextType == nil || contextId == nil {
 			contextType = "user"
-			// 从用户认证中间件获取用户ID
-			if userId, exists := c.Get("id"); exists {
-				contextIdStr = strconv.Itoa(userId.(int))
+			contextId = userId
+			// 初始化 Session
+			session.Set("context_type", contextType)
+			session.Set("context_id", contextId)
+			session.Save()
+		}
+
+		// 二次验证：确保用户仍有权限访问该空间
+		if contextType == "team" {
+			teamId := contextId.(int)
+			if !model.IsTeamOwner(teamId, userId) && !model.IsTeamMember(teamId, userId) {
+				// 权限丢失，重置为用户空间
+				contextType = "user"
+				contextId = userId
+				session.Set("context_type", contextType)
+				session.Set("context_id", contextId)
+				session.Save()
 			}
 		}
 
-		// 解析上下文ID
-		var contextId int
-		if contextIdStr != "" {
-			if id, err := strconv.Atoi(contextIdStr); err == nil {
-				contextId = id
-			}
-		}
-
-		// 将上下文信息注入到 gin.Context
-		c.Set("context_type", contextType)
-		c.Set("context_id", contextId)
+		// 注入到 gin.Context
+		c.Set("context_type", contextType.(string))
+		c.Set("context_id", contextId.(int))
 
 		c.Next()
 	}

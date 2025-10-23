@@ -37,6 +37,8 @@ func (uf *UserFactory) CreateUser() *model.User {
 		Password:    "test_password_123",
 		DisplayName: uf.generateDisplayName(),
 		Email:       uf.generateEmail(),
+		AccessToken: uf.generateAccessToken(),
+		AffCode:     uf.generateAffCode(),
 		Quota:       uf.factory.rand.Intn(1000000) + 100000, // 100k-1.1M
 		Status:      1,
 	}
@@ -70,6 +72,16 @@ func (uf *UserFactory) generateDisplayName() string {
 // generateEmail 生成随机邮箱
 func (uf *UserFactory) generateEmail() string {
 	return fmt.Sprintf("test_%d_%d@example.com", time.Now().Unix(), uf.factory.rand.Intn(10000))
+}
+
+// generateAccessToken 生成唯一的访问令牌
+func (uf *UserFactory) generateAccessToken() string {
+	return fmt.Sprintf("test_token_%d_%d", time.Now().UnixNano(), uf.factory.rand.Intn(100000))
+}
+
+// generateAffCode 生成唯一的推荐码
+func (uf *UserFactory) generateAffCode() string {
+	return fmt.Sprintf("AFF%d%d", time.Now().UnixNano(), uf.factory.rand.Intn(10000))
 }
 
 // TeamFactory 团队数据工厂

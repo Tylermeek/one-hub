@@ -9,19 +9,10 @@ export const API = axios.create({
   baseURL: import.meta.env.VITE_APP_SERVER || '/'
 });
 
-// 请求拦截器：添加上下文信息到请求头
-API.interceptors.request.use((config) => {
-  const state = store.getState();
-  const currentContext = state.context?.currentContext;
-  
-  if (currentContext) {
-    config.headers['X-Context-Type'] = currentContext.type;
-    config.headers['X-Context-Id'] = currentContext.id;
-  }
-  
-  return config;
-});
+// ❌ 删除这段代码（不再需要前端设置 Header）
+// 后端现在从 Session 读取上下文，前端无法篡改
 
+// ✅ 保留响应拦截器，增加权限错误处理
 API.interceptors.response.use(
   (response) => response,
   (error) => {
@@ -29,6 +20,11 @@ API.interceptors.response.use(
       localStorage.removeItem('user');
       store.dispatch({ type: LOGIN, payload: null });
       // window.location.href = '/login';
+    } else if (error.response?.status === 403) {
+      // 处理权限不足错误
+      if (error.response?.data?.message) {
+        error.message = error.response.data.message;
+      }
     }
 
     if (error.response?.data?.message) {

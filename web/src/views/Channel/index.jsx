@@ -26,7 +26,6 @@ import { useTranslation } from 'react-i18next';
 import { useBoolean } from 'hooks/use-boolean';
 import ConfirmDialog from 'ui-component/confirm-dialog';
 import { Icon } from '@iconify/react';
-import useCustomContext from 'hooks/useContext';
 
 const originalKeyword = {
   type: 0,
@@ -90,8 +89,6 @@ export default function ChannelList() {
   const [toolBarValue, setToolBarValue] = useState(originalKeyword);
   const [searchKeyword, setSearchKeyword] = useState(originalKeyword);
 
-  // 添加上下文支持
-  const { currentContext, isTeamContext } = useCustomContext();
 
   const theme = useTheme();
   const matchUpMd = useMediaQuery(theme.breakpoints.up('sm'));
@@ -413,23 +410,9 @@ export default function ChannelList() {
     <AdminContainer>
       <Stack direction="row" alignItems="center" justifyContent="space-between" mb={5}>
         <Stack direction="column" spacing={1}>
-          <Stack direction="row" alignItems="center" spacing={2}>
-            <Typography variant="h2">{t('channel_index.channel')}</Typography>
-            {currentContext && (
-              <Chip
-                icon={<Icon icon={isTeamContext ? "solar:users-group-rounded-bold-duotone" : "solar:user-bold-duotone"} />}
-                label={currentContext.name}
-                color={isTeamContext ? "primary" : "default"}
-                variant="outlined"
-                size="small"
-              />
-            )}
-          </Stack>
+          <Typography variant="h2">{t('channel_index.channel')}</Typography>
           <Typography variant="subtitle1" color="text.secondary">
-            {isTeamContext ? '团队渠道' : '个人渠道'}
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            当前使用「{currentContext.name}」的额度。Channel 仍属于个人管理，但消费时会从当前选择的额度池扣除。
+            全局渠道管理
           </Typography>
         </Stack>
 

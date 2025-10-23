@@ -1,7 +1,7 @@
 import PropTypes from 'prop-types';
 import { useTheme } from '@mui/material/styles';
 import { Icon } from '@iconify/react';
-import { InputAdornment, OutlinedInput, Stack, FormControl, InputLabel } from '@mui/material';
+import { InputAdornment, OutlinedInput, Stack, FormControl, InputLabel, Select, MenuItem } from '@mui/material';
 import { LocalizationProvider, DateTimePicker } from '@mui/x-date-pickers';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import dayjs from 'dayjs';
@@ -10,7 +10,7 @@ import 'dayjs/locale/zh-cn';
 
 // ----------------------------------------------------------------------
 
-export default function TableToolBar({ filterName, handleFilterName, userIsAdmin }) {
+export default function TableToolBar({ filterName, handleFilterName, userIsAdmin, contexts, selectedContextId, onContextChange }) {
   const { t } = useTranslation();
   const theme = useTheme();
   const grey500 = theme.palette.grey[500];
@@ -24,6 +24,30 @@ export default function TableToolBar({ filterName, handleFilterName, userIsAdmin
         paddingBottom={'0px'}
         sx={{ width: '100%', '& > *': { flex: 1 } }}
       >
+        {/* 空间筛选器 - 仅对普通用户显示 */}
+        {!userIsAdmin && contexts && contexts.length > 0 && (
+          <FormControl>
+            <InputLabel htmlFor="context-filter-label">空间筛选</InputLabel>
+            <Select
+              id="context-filter"
+              value={selectedContextId}
+              onChange={onContextChange}
+              label="空间筛选"
+              startAdornment={
+                <InputAdornment position="start">
+                  <Icon icon="solar:users-group-rounded-bold-duotone" width="20" color={grey500} />
+                </InputAdornment>
+              }
+            >
+              <MenuItem value={-1}>全部空间</MenuItem>
+              {contexts.map((context) => (
+                <MenuItem key={`${context.type}-${context.id}`} value={context.type === 'user' ? 0 : context.id}>
+                  {context.name}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        )}
         <FormControl>
           <InputLabel htmlFor="channel-token_name-label">{t('tableToolBar.tokenName')}</InputLabel>
           <OutlinedInput
@@ -182,5 +206,8 @@ export default function TableToolBar({ filterName, handleFilterName, userIsAdmin
 TableToolBar.propTypes = {
   filterName: PropTypes.object,
   handleFilterName: PropTypes.func,
-  userIsAdmin: PropTypes.bool
+  userIsAdmin: PropTypes.bool,
+  contexts: PropTypes.array,
+  selectedContextId: PropTypes.number,
+  onContextChange: PropTypes.func
 };

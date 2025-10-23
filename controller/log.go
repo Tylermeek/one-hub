@@ -37,7 +37,17 @@ func GetUserLogsList(c *gin.Context) {
 		return
 	}
 
-	logs, err := model.GetUserLogsList(userId, &params)
+	// 获取 team_id 筛选参数（-1=全部，0=个人，>0=特定团队）
+	teamIdStr := c.Query("team_id")
+	var teamId int = -1 // 默认显示全部
+	if teamIdStr != "" {
+		if id, err := strconv.Atoi(teamIdStr); err == nil {
+			teamId = id
+		}
+	}
+
+	// 使用新的查询方法，支持 team_id 筛选
+	logs, err := model.GetUserLogsListWithTeamFilter(userId, teamId, &params)
 	if err != nil {
 		common.APIRespondWithError(c, http.StatusOK, err)
 		return

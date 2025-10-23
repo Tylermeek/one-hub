@@ -11,7 +11,7 @@ import ButtonGroup from '@mui/material/ButtonGroup';
 import Toolbar from '@mui/material/Toolbar';
 import IconButton from '@mui/material/IconButton';
 import Divider from '@mui/material/Divider';
-import { Button, Card, Stack, Container, Typography, Box, Menu, MenuItem, Checkbox, ListItemText, Tabs, Tab } from '@mui/material';
+import { Button, Card, Stack, Container, Typography, Box, Menu, MenuItem, Checkbox, ListItemText, Tabs, Tab, Chip } from '@mui/material';
 import LogTableRow from './component/TableRow';
 import KeywordTableHead from 'ui-component/TableHead';
 import TableToolBar from './component/TableToolBar';
@@ -25,6 +25,7 @@ import useMediaQuery from '@mui/material/useMediaQuery';
 import { useTheme } from '@mui/material/styles';
 import { useSelector } from 'react-redux';
 import { useLogType } from './type/LogType';
+import useCustomContext from 'hooks/useContext';
 
 export default function Log() {
   const { t } = useTranslation();
@@ -48,6 +49,9 @@ export default function Log() {
   const [listCount, setListCount] = useState(0);
   const [searching, setSearching] = useState(false);
   const [toolBarValue, setToolBarValue] = useState(originalKeyword);
+
+  // 添加上下文支持
+  const { currentContext, isTeamContext } = useCustomContext();
   const [searchKeyword, setSearchKeyword] = useState(originalKeyword);
   const [refreshFlag, setRefreshFlag] = useState(false);
   const { userGroup } = useSelector((state) => state.account);
@@ -56,6 +60,10 @@ export default function Log() {
 
   const [logs, setLogs] = useState([]);
   const userIsAdmin = useIsAdmin();
+
+  // 空间筛选相关状态
+  const [contexts, setContexts] = useState([]);
+  const [selectedContextId, setSelectedContextId] = useState(-1); // -1=全部, 0=个人, >0=团队
 
   // 添加列显示设置相关状态
   const [columnVisibility, setColumnVisibility] = useState({
@@ -70,6 +78,7 @@ export default function Log() {
     message: true,
     completion: true,
     quota: true,
+    quota_source: true,
     source_ip: true,
     detail: true
   });
@@ -140,6 +149,28 @@ export default function Log() {
     setSearchKeyword(updatedToolBarValue);
   };
 
+  // 获取用户空间列表
+  const fetchContexts = async () => {
+    try {
+      const res = await API.get('/api/user/contexts');
+      const { success, data } = res.data;
+      if (success) {
+        setContexts(data);
+      }
+    } catch (error) {
+      console.error('Failed to fetch contexts:', error);
+    }
+  };
+
+  // 处理空间筛选变化
+  const handleContextFilterChange = (event) => {
+    const newContextId = parseInt(event.target.value);
+    setSelectedContextId(newContextId);
+    setPage(0);
+    // 触发数据重新获取
+    setRefreshFlag(!refreshFlag);
+  };
+
   const fetchData = useCallback(
     async (page, rowsPerPage, keyword, order, orderBy) => {
       setSearching(true);
@@ -159,6 +190,7 @@ export default function Log() {
             page: page + 1,
             size: rowsPerPage,
             order: orderBy,
+            team_id: selectedContextId,
             ...keyword
           }
         });
@@ -174,7 +206,7 @@ export default function Log() {
       }
       setSearching(false);
     },
-    [userIsAdmin]
+    [userIsAdmin, selectedContextId]
   );
 
   // 处理刷新
@@ -190,13 +222,43 @@ export default function Log() {
     fetchData(page, rowsPerPage, searchKeyword, order, orderBy);
   }, [page, rowsPerPage, searchKeyword, order, orderBy, fetchData, refreshFlag]);
 
+  // 初始化时获取空间列表
+  useEffect(() => {
+    if (!userIsAdmin) {
+      fetchContexts();
+    }
+  }, [userIsAdmin]);
+
+  // 监听上下文切换事件，刷新日志列表
+  useEffect(() => {
+    const handleContextChange = () => {
+      handleRefresh(); // 刷新日志列表以显示当前上下文的消费记录
+    };
+
+    window.addEventListener('contextChanged', handleContextChange);
+    return () => {
+      window.removeEventListener('contextChanged', handleContextChange);
+    };
+  }, []);
+
   return (
     <>
       <Stack direction="row" alignItems="center" justifyContent="space-between" mb={5}>
         <Stack direction="column" spacing={1}>
-          <Typography variant="h2">{t('logPage.title')}</Typography>
+          <Stack direction="row" alignItems="center" spacing={2}>
+            <Typography variant="h2">{t('logPage.title')}</Typography>
+            {currentContext && (
+              <Chip
+                icon={<Icon icon={isTeamContext ? "solar:users-group-rounded-bold-duotone" : "solar:user-bold-duotone"} />}
+                label={currentContext.name}
+                color={isTeamContext ? "primary" : "default"}
+                variant="outlined"
+                size="small"
+              />
+            )}
+          </Stack>
           <Typography variant="subtitle1" color="text.secondary">
-            Log
+            {isTeamContext ? '团队日志' : '个人日志'}
           </Typography>
         </Stack>
       </Stack>
@@ -221,7 +283,14 @@ export default function Log() {
           </Tabs>
         </Box>
         <Box component="form" noValidate>
-          <TableToolBar filterName={toolBarValue} handleFilterName={handleToolBarValue} userIsAdmin={userIsAdmin} />
+          <TableToolBar
+            filterName={toolBarValue}
+            handleFilterName={handleToolBarValue}
+            userIsAdmin={userIsAdmin}
+            contexts={contexts}
+            selectedContextId={selectedContextId}
+            onContextChange={handleContextFilterChange}
+          />
         </Box>
         <Toolbar
           sx={{
@@ -304,6 +373,7 @@ export default function Log() {
                 { id: 'message', label: t('logPage.inputLabel') },
                 { id: 'completion', label: t('logPage.outputLabel') },
                 { id: 'quota', label: t('logPage.quotaLabel') },
+                { id: 'quota_source', label: '额度来源' },
                 { id: 'source_ip', label: t('logPage.sourceIp') },
                 { id: 'detail', label: t('logPage.detailLabel') }
               ].map(
@@ -393,6 +463,12 @@ export default function Log() {
                     label: t('logPage.quotaLabel'),
                     disableSort: true,
                     hide: !columnVisibility.quota
+                  },
+                  {
+                    id: 'quota_source',
+                    label: '额度来源',
+                    disableSort: true,
+                    hide: !columnVisibility.quota_source
                   },
                   {
                     id: 'source_ip',

@@ -199,6 +199,24 @@ func GetUsersList(c *gin.Context) {
 		common.APIRespondWithError(c, http.StatusOK, err)
 		return
 	}
+
+	// 为每个用户计算团队额度信息
+	if users.Data != nil {
+		for _, user := range *users.Data {
+			totalAvailableQuota, unlimited, err := model.GetUserTotalAvailableQuota(user.Id)
+			if err == nil {
+				user.TotalAvailableQuota = totalAvailableQuota
+				user.HasUnlimitedTeam = unlimited
+				
+				// 获取团队数量
+				teamIds, err := model.GetUserTeamIds(user.Id)
+				if err == nil {
+					user.TeamCount = len(teamIds)
+				}
+			}
+		}
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"message": "",
@@ -284,13 +302,34 @@ func GetRateRealtime(c *gin.Context) {
 
 func GetUserDashboard(c *gin.Context) {
 	id := c.GetInt("id")
+	
+	// 获取上下文信息
+	contextType := c.GetString("context_type")
+	contextId := c.GetInt("context_id")
+	
+	// 根据上下文类型确定 teamId
+	var teamId int
+	if contextType == "team" {
+		// 检查用户是否为团队成员
+		if !model.IsTeamMember(contextId, id) {
+			c.JSON(http.StatusOK, gin.H{
+				"success": false,
+				"message": "无权限访问该团队的统计信息",
+			})
+			return
+		}
+		teamId = contextId
+	} else {
+		// 个人空间，teamId = 0
+		teamId = 0
+	}
 
 	now := time.Now()
 	toDay := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
 	endOfDay := toDay.Add(-time.Second).Add(time.Hour * 24).Format("2006-01-02")
 	startOfDay := toDay.AddDate(0, 0, -7).Format("2006-01-02")
 
-	dashboards, err := model.GetUserModelStatisticsByPeriod(id, startOfDay, endOfDay)
+	dashboards, err := model.GetUserModelStatisticsByContext(id, teamId, startOfDay, endOfDay)
 	if err != nil {
 		c.JSON(http.StatusOK, gin.H{
 			"success": false,
@@ -378,10 +417,151 @@ func GetSelf(c *gin.Context) {
 		})
 		return
 	}
+
+	// 计算用户总可用额度
+	totalAvailableQuota, unlimited, err := model.GetUserTotalAvailableQuota(id)
+	if err != nil {
+		// 如果计算出错，设置默认值
+		user.TotalAvailableQuota = user.Quota
+		user.HasUnlimitedTeam = false
+		user.TeamCount = 0
+	} else {
+		user.TotalAvailableQuota = totalAvailableQuota
+		user.HasUnlimitedTeam = unlimited
+		
+		// 获取团队数量
+		teamIds, err := model.GetUserTeamIds(id)
+		if err == nil {
+			user.TeamCount = len(teamIds)
+		} else {
+			user.TeamCount = 0
+		}
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"message": "",
 		"data":    user,
+	})
+}
+
+// GetContextQuota 获取当前上下文的额度信息
+func GetContextQuota(c *gin.Context) {
+	userId := c.GetInt("id")
+	contextType := c.GetString("context_type")
+	contextId := c.GetInt("context_id")
+	
+	var quota, usedQuota int
+	var unlimited bool
+	var contextName string
+	
+	if contextType == "team" {
+		// 检查用户是否为团队成员
+		if !model.IsTeamMember(contextId, userId) {
+			c.JSON(http.StatusOK, gin.H{
+				"success": false,
+				"message": "无权限访问该团队的额度信息",
+			})
+			return
+		}
+		
+		team, err := model.GetTeamById(contextId)
+		if err != nil {
+			c.JSON(http.StatusOK, gin.H{
+				"success": false,
+				"message": err.Error(),
+			})
+			return
+		}
+		
+		contextName = team.Name
+		
+		if team.UnlimitedQuota {
+			// 无限团队：基准额度 = owner.quota，used_quota = team.used_quota
+			owner, err := model.GetUserById(team.OwnerId, false)
+			if err != nil {
+				c.JSON(http.StatusOK, gin.H{
+					"success": false,
+					"message": err.Error(),
+				})
+				return
+			}
+			quota = owner.Quota
+			usedQuota = team.UsedQuota
+			unlimited = true // 实际不是无限，而是基于owner余额
+		} else {
+			// 有限团队：基准额度 = team.quota，used_quota = team.used_quota
+			quota = team.Quota
+			usedQuota = team.UsedQuota
+			unlimited = false
+		}
+	} else {
+		// 个人空间：quota = user.quota，used_quota = user.used_quota
+		contextName = "个人空间"
+		user, err := model.GetUserById(userId, false)
+		if err != nil {
+			c.JSON(http.StatusOK, gin.H{
+				"success": false,
+				"message": err.Error(),
+			})
+			return
+		}
+		quota = user.Quota
+		usedQuota = user.UsedQuota
+		unlimited = false
+	}
+	
+	available := quota - usedQuota
+	if available < 0 {
+		available = 0
+	}
+	
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"message": "",
+		"data": gin.H{
+			"context_type": contextType,
+			"context_id":   contextId,
+			"context_name": contextName,
+			"quota":        quota,
+			"used_quota":   usedQuota,
+			"available":    available,
+			"unlimited":    unlimited,
+		},
+	})
+}
+
+// GetUserContexts 获取用户的所有空间列表（个人 + 团队）
+func GetUserContexts(c *gin.Context) {
+	userId := c.GetInt("id")
+	
+	contexts := []gin.H{
+		{
+			"type": "user",
+			"id":   userId,
+			"name": "个人空间",
+		},
+	}
+	
+	// 获取用户加入的团队列表
+	teamIds, err := model.GetUserTeamIds(userId)
+	if err == nil {
+		for _, teamId := range teamIds {
+			team, err := model.GetTeamById(teamId)
+			if err == nil {
+				contexts = append(contexts, gin.H{
+					"type": "team",
+					"id":   teamId,
+					"name": team.Name,
+				})
+			}
+		}
+	}
+	
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"message": "",
+		"data":    contexts,
 	})
 }
 

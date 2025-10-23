@@ -23,6 +23,7 @@ func SetApiRouter(router *gin.Engine) {
 
 	apiRouter.POST("/telegram/:token", middleware.Telegram(), controller.TelegramBotWebHook)
 	apiRouter.Use(middleware.GlobalAPIRateLimit())
+	// 移除全局 ContextMiddleware，因为 API Key 已自带上下文信息
 	{
 		apiRouter.GET("/image/:id", controller.CheckImg)
 		apiRouter.GET("/status", controller.GetStatus)
@@ -71,6 +72,7 @@ func SetApiRouter(router *gin.Engine) {
 
 			selfRoute := userRoute.Group("/")
 			selfRoute.Use(middleware.UserAuth())
+			selfRoute.Use(middleware.ContextMiddleware()) // 仅 Web 界面需要手动切换上下文
 			{
 				selfRoute.GET("/dashboard", controller.GetUserDashboard)
 				selfRoute.GET("/dashboard/rate", controller.GetRateRealtime)
@@ -80,6 +82,8 @@ func SetApiRouter(router *gin.Engine) {
 				selfRoute.GET("/invoice/detail", controller.GetUserInvoiceDetail)
 				selfRoute.GET("/self", controller.GetSelf)
 				selfRoute.PUT("/self", controller.UpdateSelf)
+				selfRoute.GET("/context_quota", controller.GetContextQuota)
+				selfRoute.GET("/contexts", controller.GetUserContexts)
 				// selfRoute.DELETE("/self", controller.DeleteSelf)
 				selfRoute.GET("/token", controller.GenerateAccessToken)
 				selfRoute.GET("/aff", controller.GetAffCode)
@@ -245,6 +249,30 @@ func SetApiRouter(router *gin.Engine) {
 		taskRoute := apiRouter.Group("/task")
 		taskRoute.GET("/self", middleware.UserAuth(), controller.GetUserAllTask)
 		taskRoute.GET("/", middleware.AdminAuth(), controller.GetAllTask)
+
+		// 团队管理路由
+		teamRoute := apiRouter.Group("/team")
+		teamRoute.Use(middleware.UserAuth())
+		{
+			// 团队管理
+			teamRoute.POST("/", controller.CreateTeam)
+			teamRoute.GET("/list", controller.GetUserTeams)
+			teamRoute.GET("/:id", controller.GetTeam)
+			teamRoute.PUT("/:id", controller.UpdateTeam)
+			teamRoute.DELETE("/:id", controller.DeleteTeam)
+			teamRoute.POST("/:id/allocate", controller.AllocateTeamQuota) // 划分额度
+			
+			// 成员管理
+			teamRoute.GET("/:id/members", controller.GetTeamMembers)
+			teamRoute.GET("/search_users", controller.SearchUsers)
+			teamRoute.POST("/:id/invite", controller.InviteMember)
+			teamRoute.DELETE("/:id/member/:userId", controller.RemoveMember)
+			teamRoute.PUT("/:id/member/:userId/quota", controller.UpdateMemberQuota)
+			teamRoute.GET("/:id/member/:userId/usage", controller.GetMemberUsage)
+		}
+
+		// 公开路由：邀请注册
+		apiRouter.POST("/team/register", controller.RegisterWithInvite)
 	}
 
 	sseRouter := router.Group("/api/sse")

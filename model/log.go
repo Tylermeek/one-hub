@@ -2,6 +2,7 @@ package model
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"one-api/common/config"
 	"one-api/common/logger"
@@ -14,6 +15,7 @@ import (
 type Log struct {
 	Id               int                                `json:"id"`
 	UserId           int                                `json:"user_id" gorm:"index"`
+	TeamId           int                                `json:"team_id" gorm:"default:0;index"` // 所属团队ID（0表示非团队消费）
 	CreatedAt        int64                              `json:"created_at" gorm:"bigint;index:idx_created_at_type"`
 	Type             int                                `json:"type" gorm:"index:idx_created_at_type"`
 	Content          string                             `json:"content"`
@@ -93,6 +95,25 @@ func RecordConsumeLog(
 	isStream bool,
 	metadata map[string]any,
 	sourceIp string) {
+	RecordConsumeLogWithTeam(ctx, userId, channelId, promptTokens, completionTokens, modelName, tokenName, quota, content, requestTime, isStream, metadata, sourceIp, 0)
+}
+
+func RecordConsumeLogWithTeam(
+	ctx context.Context,
+	userId int,
+	channelId int,
+	promptTokens int,
+	completionTokens int,
+	modelName string,
+	tokenName string,
+	quota int,
+	content string,
+	requestTime int,
+	isStream bool,
+	metadata map[string]any,
+	sourceIp string,
+	teamId int,
+	) {
 	logger.LogInfo(ctx, fmt.Sprintf("record consume log: userId=%d, channelId=%d, promptTokens=%d, completionTokens=%d, modelName=%s, tokenName=%s, quota=%d, content=%s ,sourceIp=%s", userId, channelId, promptTokens, completionTokens, modelName, tokenName, quota, content, sourceIp))
 	if !config.LogConsumeEnabled {
 		return
@@ -115,6 +136,8 @@ func RecordConsumeLog(
 		RequestTime:      requestTime,
 		IsStream:         isStream,
 		SourceIp:         sourceIp,
+		TeamId:           teamId,
+
 	}
 
 	if metadata != nil {
@@ -137,6 +160,9 @@ type LogsListParams struct {
 	TokenName      string `form:"token_name"`
 	ChannelId      int    `form:"channel_id"`
 	SourceIp       string `form:"source_ip"`
+	// 团队相关字段
+	UserId         int    `form:"user_id"`
+	TeamId         int    `form:"team_id"`
 }
 
 var allowedLogsOrderFields = map[string]bool{
@@ -186,9 +212,21 @@ func GetLogsList(params *LogsListParams) (*DataResult[Log], error) {
 }
 
 func GetUserLogsList(userId int, params *LogsListParams) (*DataResult[Log], error) {
+	return GetUserLogsListWithTeamFilter(userId, -1, params)
+}
+
+// GetUserLogsListWithTeamFilter 按团队筛选查询用户日志列表
+// teamId: -1=全部, 0=个人空间, >0=特定团队
+func GetUserLogsListWithTeamFilter(userId int, teamId int, params *LogsListParams) (*DataResult[Log], error) {
 	var logs []*Log
 
 	tx := DB.Where("user_id = ?", userId).Omit("id")
+
+	// 根据 teamId 添加筛选条件
+	if teamId >= 0 {
+		tx = tx.Where("team_id = ?", teamId)
+	}
+	// teamId = -1 时不添加 team_id 筛选，显示所有空间的数据
 
 	if params.LogType != LogTypeUnknown {
 		tx = tx.Where("type = ?", params.LogType)
@@ -207,6 +245,53 @@ func GetUserLogsList(userId int, params *LogsListParams) (*DataResult[Log], erro
 	}
 
 	return PaginateAndOrder[Log](tx, &params.PaginationParams, &logs, allowedLogsOrderFields)
+}
+
+// GetLogsByContext 按上下文查询 Log 列表
+func GetLogsByContext(contextType string, contextId int, userId int, params *LogsListParams) (*DataResult[Log], error) {
+	var logs []*Log
+
+	var tx *gorm.DB
+	
+	if contextType == "team" {
+		// 检查用户是否为团队成员
+		if !IsTeamMember(contextId, userId) {
+			return nil, errors.New("无权限访问该团队的日志")
+		}
+		// 查询团队日志
+		tx = DB.Where("team_id = ?", contextId).Omit("id")
+	} else {
+		// 个人上下文：查询个人日志
+		tx = DB.Where("user_id = ? AND team_id = 0", userId).Omit("id")
+	}
+
+	if params.LogType != LogTypeUnknown {
+		tx = tx.Where("type = ?", params.LogType)
+	}
+	if params.ModelName != "" {
+		tx = tx.Where("model_name = ?", params.ModelName)
+	}
+	if params.TokenName != "" {
+		tx = tx.Where("token_name = ?", params.TokenName)
+	}
+	if params.StartTimestamp != 0 {
+		tx = tx.Where("created_at >= ?", params.StartTimestamp)
+	}
+	if params.EndTimestamp != 0 {
+		tx = tx.Where("created_at <= ?", params.EndTimestamp)
+	}
+
+	return PaginateAndOrder[Log](tx, &params.PaginationParams, &logs, allowedLogsOrderFields)
+}
+
+// InsertWithContext 创建 Log 并绑定上下文
+func (log *Log) InsertWithContext(contextType string, contextId int) error {
+	if contextType == "team" {
+		log.TeamId = contextId
+	} else {
+		log.TeamId = 0 // 个人日志
+	}
+	return DB.Create(log).Error
 }
 
 func SearchAllLogs(keyword string) (logs []*Log, err error) {

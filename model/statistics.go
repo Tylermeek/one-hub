@@ -12,6 +12,7 @@ type Statistics struct {
 	UserId           int       `json:"user_id" gorm:"primary_key"`
 	ChannelId        int       `json:"channel_id" gorm:"primary_key"`
 	ModelName        string    `json:"model_name" gorm:"primary_key;type:varchar(255)"`
+	TeamId           int       `json:"team_id" gorm:"primary_key;default:0;index"`
 	RequestCount     int       `json:"request_count"`
 	Quota            int       `json:"quota"`
 	PromptTokens     int       `json:"prompt_tokens"`
@@ -20,6 +21,11 @@ type Statistics struct {
 }
 
 func GetUserModelStatisticsByPeriod(userId int, startTime, endTime string) (LogStatistic []*LogStatisticGroupModel, err error) {
+	return GetUserModelStatisticsByContext(userId, 0, startTime, endTime)
+}
+
+// GetUserModelStatisticsByContext 按上下文查询用户模型统计数据
+func GetUserModelStatisticsByContext(userId int, teamId int, startTime, endTime string) (LogStatistic []*LogStatisticGroupModel, err error) {
 	dateStr := "date"
 	if common.UsingPostgreSQL {
 		dateStr = "TO_CHAR(date, 'YYYY-MM-DD') as date"
@@ -37,10 +43,11 @@ func GetUserModelStatisticsByPeriod(userId int, startTime, endTime string) (LogS
 		sum(request_time) as request_time
 		FROM statistics
 		WHERE user_id= ?
+		AND team_id = ?
 		AND date BETWEEN ? AND ?
 		GROUP BY date, model_name
 		ORDER BY date, model_name
-	`, userId, startTime, endTime).Scan(&LogStatistic).Error
+	`, userId, teamId, startTime, endTime).Scan(&LogStatistic).Error
 	return
 }
 
@@ -117,12 +124,13 @@ const (
 
 func UpdateStatistics(updateType StatisticsUpdateType) error {
 	sql := `
-	%s statistics (date, user_id, channel_id, model_name, request_count, quota, prompt_tokens, completion_tokens, request_time)
+	%s statistics (date, user_id, channel_id, model_name, team_id, request_count, quota, prompt_tokens, completion_tokens, request_time)
 	SELECT 
 		%s as date,
 		user_id,
 		channel_id,
-		model_name, 
+		model_name,
+		team_id,
 		count(1) as request_count,
 		sum(quota) as quota,
 		sum(prompt_tokens) as prompt_tokens,
@@ -132,7 +140,7 @@ func UpdateStatistics(updateType StatisticsUpdateType) error {
 	WHERE
 		type = 2
 		%s
-	GROUP BY date, channel_id, user_id, model_name
+	GROUP BY date, channel_id, user_id, model_name, team_id
 	ORDER BY date, model_name
 	%s
 	`
@@ -148,7 +156,7 @@ func UpdateStatistics(updateType StatisticsUpdateType) error {
 	} else if common.UsingPostgreSQL {
 		sqlPrefix = "INSERT INTO"
 		sqlDate = "DATE_TRUNC('day', TO_TIMESTAMP(created_at))::DATE"
-		sqlSuffix = `ON CONFLICT (date, user_id, channel_id, model_name) DO UPDATE SET
+		sqlSuffix = `ON CONFLICT (date, user_id, channel_id, model_name, team_id) DO UPDATE SET
 		request_count = EXCLUDED.request_count,
 		quota = EXCLUDED.quota,
 		prompt_tokens = EXCLUDED.prompt_tokens,

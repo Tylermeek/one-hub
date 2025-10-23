@@ -545,7 +545,8 @@ func shouldRetryBadRequest(channelType int, apiErr *types.OpenAIErrorWithStatusC
 }
 
 func processChannelRelayError(ctx context.Context, channelId int, channelName string, err *types.OpenAIErrorWithStatusCode, channelType int) {
-	logger.LogError(ctx, fmt.Sprintf("relay error (channel #%d(%s)): %s", channelId, channelName, err.Message))
+	logger.LogError(ctx, fmt.Sprintf("relay error (channel #%d(%s)): %s (status: %d, type: %s)", 
+		channelId, channelName, err.Message, err.StatusCode, err.OpenAIError.Type))
 	if controller.ShouldDisableChannel(channelType, err) {
 		controller.DisableChannel(channelId, channelName, err.Message, true)
 	}

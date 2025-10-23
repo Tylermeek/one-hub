@@ -1,13 +1,16 @@
-import { Box, Typography } from '@mui/material';
+import { Box, Typography, Stack } from '@mui/material';
 import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
 import PercentIcon from '@mui/icons-material/Percent';
 import CreditCardIcon from '@mui/icons-material/CreditCard';
 import CalculateIcon from '@mui/icons-material/Calculate';
+import GroupIcon from '@mui/icons-material/Group';
+import PersonIcon from '@mui/icons-material/Person';
 import Decimal from 'decimal.js';
 import { renderQuota } from 'utils/common';
 import { calculateOriginalQuota } from './QuotaWithDetailRow';
 import { useTranslation } from 'react-i18next';
 import PropTypes from 'prop-types';
+import Label from 'ui-component/Label';
 
 // Function to calculate price
 export function calculatePrice(ratio, groupDiscount, isTimes) {
@@ -252,6 +255,44 @@ export default function QuotaWithDetailContent({ item, userGroup, totalInputToke
           {t('logPage.quotaDetail.calculationNote')}
         </Typography>
       </Box>
+
+      {/* 团队额度来源信息 */}
+      {item.quota_source && (
+        <Box
+          sx={{
+            p: 2,
+            borderRadius: 1,
+            background: (theme) => (theme.palette.mode === 'dark' ? theme.palette.background.default : '#f0f8ff')
+          }}
+        >
+          <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+            <GroupIcon sx={{ fontSize: 20, mr: 1, color: (theme) => theme.palette.primary.main }} />
+            <Typography sx={{ fontWeight: 600, fontSize: 15 }}>额度来源</Typography>
+          </Box>
+          <Stack direction="row" spacing={2} alignItems="center">
+            {item.quota_source === 'team' && (
+              <Label color="primary" variant="soft" startIcon={<GroupIcon />}>
+                团队额度: {renderQuota(item.team_quota || 0, 6)}
+              </Label>
+            )}
+            {item.quota_source === 'user' && (
+              <Label color="secondary" variant="soft" startIcon={<PersonIcon />}>
+                个人额度: {renderQuota(item.user_quota || 0, 6)}
+              </Label>
+            )}
+            {item.quota_source === 'mixed' && (
+              <Stack direction="row" spacing={1}>
+                <Label color="primary" variant="soft" startIcon={<GroupIcon />}>
+                  团队: {renderQuota(item.team_quota || 0, 6)}
+                </Label>
+                <Label color="secondary" variant="soft" startIcon={<PersonIcon />}>
+                  个人: {renderQuota(item.user_quota || 0, 6)}
+                </Label>
+              </Stack>
+            )}
+          </Stack>
+        </Box>
+      )}
     </Box>
   );
 }

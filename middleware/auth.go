@@ -136,6 +136,9 @@ func tokenAuth(c *gin.Context, key string) {
 	c.Set("token_group", token.Group)
 	c.Set("token_backup_group", token.BackupGroup)
 	c.Set("token_setting", utils.GetPointer(token.Setting.Data()))
+	// 设置 Token 的上下文信息
+	c.Set("context_type", token.OwnerType)
+	c.Set("context_id", token.OwnerId)
 	if err := checkLimitIP(c); err != nil {
 		abortWithMessage(c, http.StatusForbidden, err.Error())
 		return

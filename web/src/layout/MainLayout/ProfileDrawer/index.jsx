@@ -1,6 +1,7 @@
 import PropTypes from 'prop-types';
 import { useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
 // material-ui
 import { useTheme } from '@mui/material/styles';
 import {
@@ -15,7 +16,8 @@ import {
   SwipeableDrawer,
   IconButton,
   Divider,
-  Stack
+  Stack,
+  Chip
 } from '@mui/material';
 
 // project imports
@@ -23,6 +25,8 @@ import User1 from 'assets/images/users/user-round.svg';
 import useLogin from 'hooks/useLogin';
 import { useTranslation } from 'react-i18next';
 import { calculateQuota } from 'utils/common';
+import useCustomContext from 'hooks/useContext';
+import { API } from 'utils/api';
 
 // assets
 import { Icon } from '@iconify/react';
@@ -38,6 +42,10 @@ const ProfileDrawer = ({ open, onClose }) => {
 
   const { logout } = useLogin();
 
+  // 添加上下文支持
+  const { currentContext, isTeamContext, getContextQuota } = useCustomContext();
+  const [contextQuota, setContextQuota] = useState(null);
+
   const handleLogout = async () => {
     logout();
     if (onClose) onClose();
@@ -47,6 +55,19 @@ const ProfileDrawer = ({ open, onClose }) => {
     navigate(path);
     if (onClose) onClose();
   };
+
+  // 获取上下文额度信息
+  useEffect(() => {
+    const fetchContextQuota = async () => {
+      if (user && currentContext) {
+        const quota = await getContextQuota();
+        if (quota) {
+          setContextQuota(quota);
+        }
+      }
+    };
+    fetchContextQuota();
+  }, [user, currentContext, getContextQuota]);
 
   const gradientAnimation = keyframes`
     0% {
@@ -65,7 +86,7 @@ const ProfileDrawer = ({ open, onClose }) => {
       anchor="right"
       open={open}
       onClose={onClose}
-      onOpen={() => {}}
+      onOpen={() => { }}
       PaperProps={{
         sx: {
           width: { xs: '85%', sm: 350 },
@@ -154,9 +175,22 @@ const ProfileDrawer = ({ open, onClose }) => {
           <Stack spacing={2}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <Typography variant="body2" color="text.secondary">
-                {t('dashboard_index.balance')}
+                {contextQuota ?
+                  (isTeamContext ? '团队额度' : '个人额度') :
+                  t('dashboard_index.balance')
+                }
               </Typography>
-              <Typography variant="body2">{user?.quota ? '$' + calculateQuota(user.quota) : t('dashboard_index.unknown')}</Typography>
+              <Typography variant="body2">
+                {contextQuota ?
+                  (contextQuota.unlimited ? '∞' : '$' + calculateQuota(contextQuota.available)) :
+                  (user?.total_available_quota !== undefined
+                    ? (user.has_unlimited_team
+                      ? '∞'
+                      : '$' + calculateQuota(user.total_available_quota))
+                    : (user?.quota ? '$' + calculateQuota(user.quota) : t('dashboard_index.unknown'))
+                  )
+                }
+              </Typography>
             </Box>
 
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -164,7 +198,10 @@ const ProfileDrawer = ({ open, onClose }) => {
                 {t('dashboard_index.used')}
               </Typography>
               <Typography variant="body2">
-                {user?.used_quota ? '$' + calculateQuota(user.used_quota) : t('dashboard_index.unknown')}
+                {contextQuota ?
+                  '$' + calculateQuota(contextQuota.used_quota) :
+                  (user?.used_quota ? '$' + calculateQuota(user.used_quota) : t('dashboard_index.unknown'))
+                }
               </Typography>
             </Box>
 

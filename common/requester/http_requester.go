@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"one-api/common"
+	"one-api/common/logger"
 	"one-api/common/utils"
 	"one-api/types"
 	"strconv"
@@ -74,8 +75,13 @@ func (r *HTTPRequester) NewRequest(method, url string, setters ...requestOption)
 
 // 发送请求
 func (r *HTTPRequester) SendRequest(req *http.Request, response any, outputResp bool) (*http.Response, *types.OpenAIErrorWithStatusCode) {
+	// 记录详细的请求信息
+	logRequestDetails(req)
+	
 	resp, err := HTTPClient.Do(req)
 	if err != nil {
+		// 记录请求失败时的详细信息
+		logRequestError(req, err)
 		return nil, common.ErrorWrapper(err, "http_request_failed", http.StatusInternalServerError)
 	}
 
@@ -113,9 +119,14 @@ func (r *HTTPRequester) SendRequest(req *http.Request, response any, outputResp 
 
 // 发送请求 RAW
 func (r *HTTPRequester) SendRequestRaw(req *http.Request) (*http.Response, *types.OpenAIErrorWithStatusCode) {
+	// 记录详细的请求信息
+	logRequestDetails(req)
+	
 	// 发送请求
 	resp, err := HTTPClient.Do(req)
 	if err != nil {
+		// 记录请求失败时的详细信息
+		logRequestError(req, err)
 		return nil, common.ErrorWrapper(err, "http_request_failed", http.StatusInternalServerError)
 	}
 
@@ -277,4 +288,66 @@ func DecodeString(body io.Reader, output *string) error {
 	}
 	*output = string(b)
 	return nil
+}
+
+// logRequestDetails 记录详细的请求信息
+func logRequestDetails(req *http.Request) {
+	// 读取请求体
+	var bodyBytes []byte
+	if req.Body != nil {
+		bodyBytes, _ = io.ReadAll(req.Body)
+		// 重新设置请求体，因为ReadAll会消耗掉body
+		req.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
+	}
+
+	// 构建请求头字符串
+	var headers []string
+	for name, values := range req.Header {
+		for _, value := range values {
+			headers = append(headers, fmt.Sprintf("%s: %s", name, value))
+		}
+	}
+
+	// 记录请求信息
+	logger.SysDebug(fmt.Sprintf("发送HTTP请求到上游API:\n"+
+		"URL: %s\n"+
+		"Method: %s\n"+
+		"Headers: %s\n"+
+		"Body: %s",
+		req.URL.String(),
+		req.Method,
+		strings.Join(headers, "\n"),
+		string(bodyBytes)))
+}
+
+// logRequestError 记录请求失败时的详细信息
+func logRequestError(req *http.Request, err error) {
+	// 读取请求体
+	var bodyBytes []byte
+	if req.Body != nil {
+		bodyBytes, _ = io.ReadAll(req.Body)
+		// 重新设置请求体
+		req.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
+	}
+
+	// 构建请求头字符串
+	var headers []string
+	for name, values := range req.Header {
+		for _, value := range values {
+			headers = append(headers, fmt.Sprintf("%s: %s", name, value))
+		}
+	}
+
+	// 记录错误信息
+	logger.SysError(fmt.Sprintf("HTTP请求失败:\n"+
+		"URL: %s\n"+
+		"Method: %s\n"+
+		"Headers: %s\n"+
+		"Body: %s\n"+
+		"Error: %v",
+		req.URL.String(),
+		req.Method,
+		strings.Join(headers, "\n"),
+		string(bodyBytes),
+		err))
 }

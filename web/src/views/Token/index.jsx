@@ -11,7 +11,7 @@ import Alert from '@mui/material/Alert';
 import ButtonGroup from '@mui/material/ButtonGroup';
 import Toolbar from '@mui/material/Toolbar';
 
-import { Button, Card, Box, Stack, Container, Typography } from '@mui/material';
+import { Button, Card, Box, Stack, Container, Typography, Chip } from '@mui/material';
 import TokensTableRow from './component/TableRow';
 import KeywordTableHead from 'ui-component/TableHead';
 import TableToolBar from 'ui-component/TableToolBar';
@@ -22,6 +22,7 @@ import { useSelector } from 'react-redux';
 import { PAGE_SIZE_OPTIONS, getPageSize, savePageSize } from 'constants';
 import { useTranslation } from 'react-i18next';
 import { UserContext } from 'contexts/UserContext';
+import useCustomContext from 'hooks/useContext';
 
 export default function Token() {
   const { t } = useTranslation();
@@ -41,6 +42,9 @@ export default function Token() {
   const [editTokenId, setEditTokenId] = useState(0);
   const siteInfo = useSelector((state) => state.siteInfo);
   const { userGroup } = useSelector((state) => state.account);
+
+  // 添加上下文支持
+  const { currentContext, isTeamContext } = useCustomContext();
 
   const handleSort = (event, id) => {
     const isAsc = orderBy === id && order === 'asc';
@@ -107,6 +111,18 @@ export default function Token() {
     fetchData(page, rowsPerPage, searchKeyword, order, orderBy);
   }, [page, rowsPerPage, searchKeyword, order, orderBy, refreshFlag]);
 
+  // 监听上下文切换事件，刷新 Token 列表
+  useEffect(() => {
+    const handleContextChange = () => {
+      handleRefresh(); // 刷新 Token 列表
+    };
+
+    window.addEventListener('contextChanged', handleContextChange);
+    return () => {
+      window.removeEventListener('contextChanged', handleContextChange);
+    };
+  }, []);
+
   useEffect(() => {
     loadUserGroup();
   }, [loadUserGroup]);
@@ -172,9 +188,23 @@ export default function Token() {
     <>
       <Stack direction="row" alignItems="center" justifyContent="space-between" mb={5}>
         <Stack direction="column" spacing={1}>
-          <Typography variant="h2">{t('token_index.token')}</Typography>
+          <Stack direction="row" alignItems="center" spacing={2}>
+            <Typography variant="h2">{t('token_index.token')}</Typography>
+            {currentContext && (
+              <Chip
+                icon={<Icon icon={isTeamContext ? "solar:users-group-rounded-bold-duotone" : "solar:user-bold-duotone"} />}
+                label={currentContext.name}
+                color={isTeamContext ? "primary" : "default"}
+                variant="outlined"
+                size="small"
+              />
+            )}
+          </Stack>
           <Typography variant="subtitle1" color="text.secondary">
-            Token
+            {isTeamContext ? '团队 Token' : '个人 Token'}
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            当前使用「{currentContext.name}」的额度。Token 仍属于个人管理，但消费时会从当前选择的额度池扣除。
           </Typography>
         </Stack>
 

@@ -14,13 +14,17 @@ import (
 
 func GetUserTokensList(c *gin.Context) {
 	userId := c.GetInt("id")
+	contextType := c.GetString("context_type")
+	contextId := c.GetInt("context_id")
+	
 	var params model.GenericParams
 	if err := c.ShouldBindQuery(&params); err != nil {
 		common.APIRespondWithError(c, http.StatusOK, err)
 		return
 	}
 
-	tokens, err := model.GetUserTokensList(userId, &params)
+	// 使用上下文感知的查询方法
+	tokens, err := model.GetTokensByContext(contextType, contextId, userId, &params)
 	if err != nil {
 		common.APIRespondWithError(c, http.StatusOK, err)
 		return
@@ -92,6 +96,9 @@ func GetPlaygroundToken(c *gin.Context) {
 
 func AddToken(c *gin.Context) {
 	userId := c.GetInt("id")
+	contextType := c.GetString("context_type")
+	contextId := c.GetInt("context_id")
+	
 	token := model.Token{}
 	err := c.ShouldBindJSON(&token)
 	if err != nil {
@@ -150,7 +157,9 @@ func AddToken(c *gin.Context) {
 		BackupGroup:    token.BackupGroup,
 		Setting:        token.Setting,
 	}
-	err = cleanToken.Insert()
+	
+	// 使用上下文感知的插入方法
+	err = cleanToken.InsertWithContext(contextType, contextId)
 	if err != nil {
 		c.JSON(http.StatusOK, gin.H{
 			"success": false,

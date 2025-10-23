@@ -9,6 +9,19 @@ export const API = axios.create({
   baseURL: import.meta.env.VITE_APP_SERVER || '/'
 });
 
+// 请求拦截器：添加上下文信息到请求头
+API.interceptors.request.use((config) => {
+  const state = store.getState();
+  const currentContext = state.context?.currentContext;
+  
+  if (currentContext) {
+    config.headers['X-Context-Type'] = currentContext.type;
+    config.headers['X-Context-Id'] = currentContext.id;
+  }
+  
+  return config;
+});
+
 API.interceptors.response.use(
   (response) => response,
   (error) => {

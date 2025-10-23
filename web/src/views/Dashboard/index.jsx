@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Grid, Box, Stack, Typography, Button } from '@mui/material';
+import { Grid, Box, Stack, Typography, Button, Chip } from '@mui/material';
 import { gridSpacing } from 'store/constant';
 import StatisticalLineChartCard from './component/StatisticalLineChartCard';
 import ApexCharts from 'ui-component/chart/ApexCharts';
@@ -15,6 +15,8 @@ import QuickStartCard from './component/QuickStartCard';
 import RPM from './component/RPM';
 import StatusPanel from './component/StatusPanel';
 import { useSelector } from 'react-redux';
+import useCustomContext from 'hooks/useContext';
+import { Icon } from '@iconify/react';
 
 // TabPanel component for tab content
 function TabPanel(props) {
@@ -48,6 +50,10 @@ const Dashboard = () => {
   const [currentTab, setCurrentTab] = useState(0);
 
   const [dashboardData, setDashboardData] = useState(null);
+  const [quotaData, setQuotaData] = useState(null);
+
+  // 添加上下文支持
+  const { currentContext, isTeamContext } = useCustomContext();
   const siteInfo = useSelector((state) => state.siteInfo);
 
   const handleTabChange = (newValue) => {
@@ -56,29 +62,55 @@ const Dashboard = () => {
 
   const userDashboard = async () => {
     try {
-      const res = await API.get('/api/user/dashboard');
-      const { success, message, data } = res.data;
-      if (success) {
-        if (data) {
-          setDashboardData(data);
-          let lineData = getLineDataGroup(data);
-          setRequestChart(getLineCardOption(lineData, 'RequestCount'));
-          setQuotaChart(getLineCardOption(lineData, 'Quota'));
-          setTokenChart(getLineCardOption(lineData, 'PromptTokens'));
-          setStatisticalData(getBarDataGroup(data));
-          setModelUsageData(getModelUsageData(data));
-        }
-      } else {
-        showError(message);
+      // 并行获取 Dashboard 数据和额度信息
+      const [dashboardRes, quotaRes] = await Promise.all([
+        API.get('/api/user/dashboard'),
+        API.get('/api/user/context_quota')
+      ]);
+
+      // 处理 Dashboard 数据
+      const { success: dashboardSuccess, message: dashboardMessage, data: dashboardData } = dashboardRes.data;
+      if (dashboardSuccess && dashboardData) {
+        setDashboardData(dashboardData);
+        let lineData = getLineDataGroup(dashboardData);
+        setRequestChart(getLineCardOption(lineData, 'RequestCount'));
+        setQuotaChart(getLineCardOption(lineData, 'Quota'));
+        setTokenChart(getLineCardOption(lineData, 'PromptTokens'));
+        setStatisticalData(getBarDataGroup(dashboardData));
+        setModelUsageData(getModelUsageData(dashboardData));
+      } else if (!dashboardSuccess) {
+        showError(dashboardMessage);
       }
+
+      // 处理额度数据
+      const { success: quotaSuccess, message: quotaMessage, data: quotaData } = quotaRes.data;
+      if (quotaSuccess && quotaData) {
+        setQuotaData(quotaData);
+      } else if (!quotaSuccess) {
+        showError(quotaMessage);
+      }
+
       setLoading(false);
     } catch (error) {
-      return;
+      console.error('Dashboard data fetch error:', error);
+      setLoading(false);
     }
   };
 
   useEffect(() => {
     userDashboard();
+  }, []);
+
+  // 监听上下文切换事件，刷新额度数据
+  useEffect(() => {
+    const handleContextChange = () => {
+      userDashboard(); // 重新获取当前上下文的额度和统计数据
+    };
+
+    window.addEventListener('contextChanged', handleContextChange);
+    return () => {
+      window.removeEventListener('contextChanged', handleContextChange);
+    };
   }, []);
 
   // Dashboard content
@@ -159,15 +191,32 @@ const Dashboard = () => {
       <Stack direction="row" alignItems="center" justifyContent="space-between" mb={1}>
         <Stack direction="row" alignItems="center" spacing={3}>
           <Stack direction="column" spacing={1}>
-            <Typography variant="h2">{t('dashboard_index.title')}</Typography>
+            <Stack direction="row" alignItems="center" spacing={2}>
+              <Typography variant="h2">{t('dashboard_index.title')}</Typography>
+              {currentContext && (
+                <Chip
+                  icon={<Icon icon={isTeamContext ? "solar:users-group-rounded-bold-duotone" : "solar:user-bold-duotone"} />}
+                  label={currentContext.name}
+                  color={isTeamContext ? "primary" : "default"}
+                  variant="outlined"
+                  size="small"
+                />
+              )}
+            </Stack>
             <Typography variant="subtitle1" color="text.secondary">
-              Dashboard
+              {isTeamContext ? '团队仪表板' : '个人仪表板'}
             </Typography>
+            {quotaData && (
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                可用额度: {quotaData.unlimited ? '∞' : quotaData.available.toLocaleString()}
+                {quotaData.unlimited ? '' : ` / ${quotaData.quota.toLocaleString()}`}
+              </Typography>
+            )}
           </Stack>
 
           {siteInfo.UptimeEnabled && (
             <Stack direction="row" spacing={1}>
-              <Button 
+              <Button
                 onClick={() => handleTabChange(0)}
                 variant={currentTab === 0 ? "contained" : "text"}
                 size="small"
@@ -184,7 +233,7 @@ const Dashboard = () => {
               >
                 {t('dashboard_index.tab_dashboard')}
               </Button>
-              <Button 
+              <Button
                 onClick={() => handleTabChange(1)}
                 variant={currentTab === 1 ? "contained" : "text"}
                 size="small"

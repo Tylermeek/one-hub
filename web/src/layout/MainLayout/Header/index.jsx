@@ -10,6 +10,7 @@ import { Box, IconButton, Stack } from '@mui/material';
 // project imports
 import LogoSection from '../LogoSection';
 import Profile from './Profile';
+import ContextSwitcher from './ContextSwitcher';
 import ThemeButton from 'ui-component/ThemeButton';
 import I18nButton from 'ui-component/i18nButton';
 import { NoticeButton } from 'ui-component/notice';
@@ -23,7 +24,7 @@ const Header = ({ handleLeftDrawerToggle, toggleProfileDrawer }) => {
   const theme = useTheme();
   const [isDrawerOpen, setIsDrawerOpen] = useState(true);
   const location = useLocation();
-  
+
   // 检查当前路径是否为面板/控制台页面
   const isConsoleRoute = location.pathname.startsWith('/panel');
 
@@ -76,6 +77,7 @@ const Header = ({ handleLeftDrawerToggle, toggleProfileDrawer }) => {
 
       {/* 右侧功能按钮区 */}
       <Stack direction="row" spacing={1} alignItems="center">
+        {isConsoleRoute && <ContextSwitcher />}
         <NoticeButton />
         <ThemeButton />
         <I18nButton />

@@ -11,3 +11,9 @@ export const LOGOUT = '@account/LOGOUT';
 export const SET_THEME = '@customization/SET_THEME';
 
 export const SET_USER_GROUP = '@userGroup/SET_USER_GROUP';
+
+// Context actions
+export const SWITCH_CONTEXT = '@context/SWITCH_CONTEXT';
+export const LOAD_USER_TEAMS = '@context/LOAD_USER_TEAMS';
+export const RESTORE_CONTEXT = '@context/RESTORE_CONTEXT';
+export const CLEAR_CONTEXT = '@context/CLEAR_CONTEXT';

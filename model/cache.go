@@ -100,6 +100,14 @@ func CacheDecreaseUserQuota(id int, quota int) error {
 	return err
 }
 
+func CacheIncreaseUserQuota(id int, quota int) error {
+	if !config.RedisEnabled {
+		return nil
+	}
+	err := redis.RedisIncrease(fmt.Sprintf(UserQuotaCacheKey, id), int64(quota))
+	return err
+}
+
 func CacheIsUserEnabled(userId int) (bool, error) {
 	if !config.RedisEnabled {
 		return IsUserEnabled(userId)

@@ -9,6 +9,7 @@ import User1 from 'assets/images/users/user-round.svg';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Icon } from '@iconify/react';
+import useCustomContext from 'hooks/useContext';
 
 const CardStyle = styled(Card)(({ theme }) => ({
   background: theme.palette.mode === 'dark' ? alpha(theme.palette.background.paper, 0.8) : alpha(theme.palette.background.paper, 0.9),
@@ -64,11 +65,13 @@ const InfoChip = styled(Chip)(() => ({
 const MenuCard = () => {
   const theme = useTheme();
   const { user, userGroup } = useSelector((state) => state.account);
+  const { currentContext, isTeamContext } = useCustomContext();
   const navigate = useNavigate();
   const { t } = useTranslation();
   const [balance, setBalance] = useState(0);
   const [usedQuota, setUsedQuota] = useState(0);
   const [requestCount, setRequestCount] = useState(0);
+  const [contextQuota, setContextQuota] = useState(null);
 
   // Define the gradient animation
   const gradientAnimation = keyframes`
@@ -85,16 +88,49 @@ const MenuCard = () => {
 
   const quotaPerUnit = localStorage.getItem('quota_per_unit') || 500000;
 
-  const totalQuota = parseFloat(balance) + parseFloat(usedQuota);
-  const progressValue = (parseFloat(usedQuota) / totalQuota) * 100;
+  const totalQuota = balance === '∞' ? 999999999 : (parseFloat(balance) + parseFloat(usedQuota));
+  const progressValue = balance === '∞' ? 0 : (parseFloat(usedQuota) / totalQuota) * 100;
+
+  // 获取上下文额度信息
+  const { getContextQuota } = useCustomContext();
 
   useEffect(() => {
-    if (user) {
-      setBalance(((user.quota || 0) / quotaPerUnit).toFixed(2));
+    const fetchContextQuota = async () => {
+      if (user && currentContext) {
+        const quota = await getContextQuota();
+        if (quota) {
+          setContextQuota(quota);
+          if (quota.unlimited) {
+            setBalance('∞');
+          } else {
+            setBalance((quota.available / quotaPerUnit).toFixed(2));
+          }
+          setUsedQuota((quota.used_quota / quotaPerUnit).toFixed(2));
+        }
+      }
+    };
+
+    fetchContextQuota();
+  }, [user, currentContext, getContextQuota, quotaPerUnit]);
+
+  // 兼容旧逻辑：如果没有上下文额度信息，使用用户信息
+  useEffect(() => {
+    if (user && !contextQuota) {
+      // 如果有团队信息，使用总可用额度
+      if (user.total_available_quota !== undefined) {
+        if (user.has_unlimited_team) {
+          setBalance('∞');
+        } else {
+          setBalance(((user.total_available_quota || 0) / quotaPerUnit).toFixed(2));
+        }
+      } else {
+        // 兼容原有逻辑
+        setBalance(((user.quota || 0) / quotaPerUnit).toFixed(2));
+      }
       setUsedQuota(((user.used_quota || 0) / quotaPerUnit).toFixed(2));
       setRequestCount(user.request_count || 0);
     }
-  }, [user, quotaPerUnit]);
+  }, [user, contextQuota, quotaPerUnit]);
 
   const getProgressColor = () => {
     if (progressValue < 60) return theme.palette.success.main;
@@ -106,9 +142,9 @@ const MenuCard = () => {
     <CardStyle>
       <CardContent sx={{ p: 1.5, pb: '8px !important' }}>
         <Stack direction="row" spacing={1} alignItems="center" mb={1}>
-          <Box 
+          <Box
             component="div"
-            sx={{ 
+            sx={{
               cursor: 'pointer',
               position: 'relative',
               width: '38px',
@@ -187,7 +223,10 @@ const MenuCard = () => {
               sx={{ fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: 0.5, mr: 'auto' }}
             >
               <Icon icon="solar:wallet-money-linear" width={12} />
-              {t('sidebar.remainingBalance')}: ${balance}
+              {contextQuota ?
+                `${isTeamContext ? '团队额度' : '个人额度'}: $${balance}` :
+                `${t('sidebar.remainingBalance')}: $${balance}`
+              }
             </Typography>
             <Tooltip title={t('dashboard_index.calls')}>
               <Typography

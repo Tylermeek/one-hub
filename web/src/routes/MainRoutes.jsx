@@ -25,6 +25,8 @@ const UserGroup = Loadable(lazy(() => import('views/UserGroup')));
 const ModelOwnedby = Loadable(lazy(() => import('views/ModelOwnedby')));
 const Invoice = Loadable(lazy(() => import('views/Invoice')));
 const InvoiceDetail = Loadable(lazy(() => import('views/Invoice/detail')));
+const Team = Loadable(lazy(() => import('views/Team')));
+const TeamDetail = Loadable(lazy(() => import('views/Team/TeamDetail')));
 // dashboard routing
 const Dashboard = Loadable(lazy(() => import('views/Dashboard')));
 
@@ -131,6 +133,14 @@ const MainRoutes = {
     {
       path: 'system_info',
       element: <SystemInfo />
+    },
+    {
+      path: 'team',
+      element: <Team />
+    },
+    {
+      path: 'team/:id',
+      element: <TeamDetail />
     }
   ]
 };

@@ -13,7 +13,7 @@ import Toolbar from '@mui/material/Toolbar';
 import useMediaQuery from '@mui/material/useMediaQuery';
 import Alert from '@mui/material/Alert';
 
-import { Button, IconButton, Card, Box, Stack, Container, Typography, Divider } from '@mui/material';
+import { Button, IconButton, Card, Box, Stack, Container, Typography, Divider, Chip } from '@mui/material';
 import ChannelTableRow from './component/TableRow';
 import KeywordTableHead from 'ui-component/TableHead';
 import { API } from 'utils/api';
@@ -26,6 +26,7 @@ import { useTranslation } from 'react-i18next';
 import { useBoolean } from 'hooks/use-boolean';
 import ConfirmDialog from 'ui-component/confirm-dialog';
 import { Icon } from '@iconify/react';
+import useCustomContext from 'hooks/useContext';
 
 const originalKeyword = {
   type: 0,
@@ -83,11 +84,14 @@ export default function ChannelList() {
 
   const confirm = useBoolean();
   const [confirmTitle, setConfirmTitle] = useState('');
-  const [confirmConfirm, setConfirmConfirm] = useState(() => {});
+  const [confirmConfirm, setConfirmConfirm] = useState(() => { });
 
   const [groupOptions, setGroupOptions] = useState([]);
   const [toolBarValue, setToolBarValue] = useState(originalKeyword);
   const [searchKeyword, setSearchKeyword] = useState(originalKeyword);
+
+  // 添加上下文支持
+  const { currentContext, isTeamContext } = useCustomContext();
 
   const theme = useTheme();
   const matchUpMd = useMediaQuery(theme.breakpoints.up('sm'));
@@ -386,6 +390,18 @@ export default function ChannelList() {
     fetchData(page, rowsPerPage, searchKeyword, order, orderBy);
   }, [page, rowsPerPage, searchKeyword, order, orderBy, refreshFlag]);
 
+  // 监听上下文切换事件，刷新 Channel 列表
+  useEffect(() => {
+    const handleContextChange = () => {
+      handleRefresh(false); // 刷新 Channel 列表
+    };
+
+    window.addEventListener('contextChanged', handleContextChange);
+    return () => {
+      window.removeEventListener('contextChanged', handleContextChange);
+    };
+  }, []);
+
   useEffect(() => {
     fetchGroups().then();
     fetchTags().then();
@@ -397,9 +413,23 @@ export default function ChannelList() {
     <AdminContainer>
       <Stack direction="row" alignItems="center" justifyContent="space-between" mb={5}>
         <Stack direction="column" spacing={1}>
-          <Typography variant="h2">{t('channel_index.channel')}</Typography>
+          <Stack direction="row" alignItems="center" spacing={2}>
+            <Typography variant="h2">{t('channel_index.channel')}</Typography>
+            {currentContext && (
+              <Chip
+                icon={<Icon icon={isTeamContext ? "solar:users-group-rounded-bold-duotone" : "solar:user-bold-duotone"} />}
+                label={currentContext.name}
+                color={isTeamContext ? "primary" : "default"}
+                variant="outlined"
+                size="small"
+              />
+            )}
+          </Stack>
           <Typography variant="subtitle1" color="text.secondary">
-            Channel
+            {isTeamContext ? '团队渠道' : '个人渠道'}
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            当前使用「{currentContext.name}」的额度。Channel 仍属于个人管理，但消费时会从当前选择的额度池扣除。
           </Typography>
         </Stack>
 

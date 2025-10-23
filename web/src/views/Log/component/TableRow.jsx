@@ -173,6 +173,11 @@ export default function LogTableRow({ item, userIsAdmin, userGroup, columnVisibi
             )}
           </TableCell>
         )}
+        {columnVisibility.quota_source && (
+          <TableCell sx={{ p: '10px 8px' }}>
+            {renderQuotaSource(item)}
+          </TableCell>
+        )}
         {columnVisibility.source_ip && <TableCell sx={{ p: '10px 8px' }}>{item.source_ip || ''}</TableCell>}
         {columnVisibility.detail && (
           <TableCell sx={{ p: '10px 8px' }}>{viewLogContent(item, t, totalInputTokens, totalOutputTokens)}</TableCell>
@@ -389,6 +394,50 @@ function calculateTokens(item) {
     show,
     tokenDetails
   };
+}
+
+function renderQuotaSource(item) {
+  if (!item.quota_source) {
+    return <Label color="default" variant="soft">个人</Label>;
+  }
+
+  const source = item.quota_source;
+  const teamQuota = item.team_quota || 0;
+  const userQuota = item.user_quota || 0;
+
+  if (source === 'team') {
+    return (
+      <Stack direction="column" spacing={0.5}>
+        <Label color="primary" variant="soft">团队</Label>
+        <Typography variant="caption" color="textSecondary">
+          团队: {renderQuota(teamQuota, 2)}
+        </Typography>
+      </Stack>
+    );
+  } else if (source === 'user') {
+    return (
+      <Stack direction="column" spacing={0.5}>
+        <Label color="secondary" variant="soft">个人</Label>
+        <Typography variant="caption" color="textSecondary">
+          个人: {renderQuota(userQuota, 2)}
+        </Typography>
+      </Stack>
+    );
+  } else if (source === 'mixed') {
+    return (
+      <Stack direction="column" spacing={0.5}>
+        <Label color="warning" variant="soft">混合</Label>
+        <Typography variant="caption" color="textSecondary">
+          团队: {renderQuota(teamQuota, 2)}
+        </Typography>
+        <Typography variant="caption" color="textSecondary">
+          个人: {renderQuota(userQuota, 2)}
+        </Typography>
+      </Stack>
+    );
+  }
+
+  return <Label color="default" variant="soft">个人</Label>;
 }
 
 function viewLogContent(item, t) {

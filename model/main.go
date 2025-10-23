@@ -189,6 +189,15 @@ func InitDB() (err error) {
 			return err
 		}
 
+		err = db.AutoMigrate(&Team{})
+		if err != nil {
+			return err
+		}
+		err = db.AutoMigrate(&TeamMember{})
+		if err != nil {
+			return err
+		}
+
 		if config.UserInvoiceMonth {
 			err = db.AutoMigrate(&StatisticsMonthGeneratedHistory{})
 			if err != nil {

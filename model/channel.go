@@ -3,6 +3,7 @@ package model
 import (
 	"crypto/md5"
 	"encoding/hex"
+	"errors"
 	"one-api/common/config"
 	"one-api/common/logger"
 	"one-api/common/utils"
@@ -15,6 +16,9 @@ import (
 
 type Channel struct {
 	Id                 int     `json:"id"`
+	UserId             int     `json:"user_id" gorm:"default:0"`
+	OwnerType          string  `json:"owner_type" gorm:"type:varchar(10);default:'user'"` // "user" or "team"
+	OwnerId            int     `json:"owner_id" gorm:"default:0"`                          // user_id or team_id
 	Type               int     `json:"type" form:"type" gorm:"default:0"`
 	Key                string  `json:"key" form:"key" gorm:"type:text"`
 	Status             int     `json:"status" form:"status" gorm:"default:1"`
@@ -80,6 +84,87 @@ func GetChannelsList(params *SearchChannelsParams) (*DataResult[Channel], error)
 
 	db := DB.Omit("key")
 	tagDB := DB.Model(&Channel{}).Select("Max(id) as id").Where("tag != ''").Group("tag")
+
+	if params.Type != 0 {
+		db = db.Where("type = ?", params.Type)
+		tagDB = tagDB.Where("type = ?", params.Type)
+	}
+
+	if params.Status != 0 {
+		db = db.Where("status = ?", params.Status)
+		tagDB = tagDB.Where("status = ?", params.Status)
+	}
+
+	if params.Name != "" {
+		db = db.Where("name LIKE ?", "%"+params.Name+"%")
+		tagDB = tagDB.Where("tag LIKE ?", "%"+params.Name+"%")
+	}
+
+	if params.Group != "" {
+		groupKey := quotePostgresField("group")
+		db = db.Where("( "+groupKey+" LIKE ? OR "+groupKey+" LIKE ? OR "+groupKey+" LIKE ? OR "+groupKey+" = ?)",
+			"%,"+params.Group+",%", params.Group+",%", "%,"+params.Group, params.Group)
+		tagDB = tagDB.Where("( "+groupKey+" LIKE ? OR "+groupKey+" LIKE ? OR "+groupKey+" LIKE ? OR "+groupKey+" = ?)",
+			"%,"+params.Group+",%", params.Group+",%", "%,"+params.Group, params.Group)
+	}
+
+	if params.Models != "" {
+		db = db.Where("models LIKE ?", "%"+params.Models+"%")
+		tagDB = tagDB.Where("models LIKE ?", "%"+params.Models+"%")
+	}
+
+	if params.Other != "" {
+		db = db.Where("other LIKE ?", params.Other+"%")
+		tagDB = tagDB.Where("other LIKE ?", params.Other+"%")
+	}
+
+	if params.Key != "" {
+		db = db.Where(quotePostgresField("key")+" = ?", params.Key)
+		tagDB = tagDB.Where(quotePostgresField("key")+" = ?", params.Key)
+	}
+
+	if params.TestModel != "" {
+		db = db.Where("test_model LIKE ?", params.TestModel+"%")
+		tagDB = tagDB.Where("test_model LIKE ?", params.TestModel+"%")
+	}
+
+	if params.Tag != "" {
+		db = db.Where("tag = ?", params.Tag)
+		tagDB = tagDB.Where("tag = ?", params.Tag)
+	}
+
+	switch params.FilterTag {
+	case 1:
+		db = db.Where("tag = ''")
+	case 2:
+		db = db.Where("id IN (?)", tagDB)
+	default:
+		db = db.Where("tag = '' OR id IN (?)", tagDB)
+	}
+
+	return PaginateAndOrder(db, &params.PaginationParams, &channels, allowedChannelOrderFields)
+}
+
+// GetChannelsByContext 按上下文查询 Channel 列表
+func GetChannelsByContext(contextType string, contextId int, userId int, params *SearchChannelsParams) (*DataResult[Channel], error) {
+	var channels []*Channel
+
+	db := DB.Omit("key").Where("owner_type = ? AND owner_id = ?", contextType, contextId)
+
+	// 权限检查：确保用户有权限访问该上下文的 Channel
+	if contextType == "team" {
+		// 检查用户是否为团队成员
+		if !IsTeamMember(contextId, userId) {
+			return nil, errors.New("无权限访问该团队的 Channel")
+		}
+	} else if contextType == "user" {
+		// 确保只能访问自己的 Channel
+		if contextId != userId {
+			return nil, errors.New("无权限访问其他用户的 Channel")
+		}
+	}
+
+	tagDB := DB.Model(&Channel{}).Select("Max(id) as id").Where("tag != '' AND owner_type = ? AND owner_id = ?", contextType, contextId).Group("tag")
 
 	if params.Type != 0 {
 		db = db.Where("type = ?", params.Type)
@@ -275,6 +360,13 @@ func (channel *Channel) Insert() error {
 	}
 
 	return err
+}
+
+// InsertWithContext 创建 Channel 并绑定到指定上下文
+func (channel *Channel) InsertWithContext(contextType string, contextId int) error {
+	channel.OwnerType = contextType
+	channel.OwnerId = contextId
+	return channel.Insert()
 }
 
 func (channel *Channel) Update(overwrite bool) error {

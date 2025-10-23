@@ -40,7 +40,7 @@ require (
 	github.com/smartwalle/alipay/v3 v3.2.25
 	github.com/spf13/viper v1.20.1
 	github.com/sqids/sqids-go v0.4.1
-	github.com/stretchr/testify v1.10.0
+	github.com/stretchr/testify v1.11.1
 	github.com/stripe/stripe-go/v80 v80.2.1
 	github.com/vmihailenco/msgpack/v5 v5.4.1
 	github.com/wechatpay-apiv3/wechatpay-go v0.2.20
@@ -98,6 +98,7 @@ require (
 	github.com/spf13/afero v1.14.0 // indirect
 	github.com/spf13/cast v1.9.2 // indirect
 	github.com/spf13/pflag v1.0.6 // indirect
+	github.com/stretchr/objx v0.5.2 // indirect
 	github.com/subosito/gotenv v1.6.0 // indirect
 	github.com/tidwall/gjson v1.18.0 // indirect
 	github.com/tidwall/match v1.1.1 // indirect

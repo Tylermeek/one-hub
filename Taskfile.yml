@@ -90,6 +90,69 @@ tasks:
       - GOOS=linux GOARCH=amd64 go build -o {{.BIN_DIR}} -ldflags "{{.LDFLAGS}}"
       - docker buildx build --pull --push --platform linux/amd64 -t "{{.IMAGE}}" .
 
+  # 测试相关任务
+  test:unit:
+    desc: "运行单元测试（Mock DB）"
+    cmds:
+      - go test -v ./test/unit/...
+
+  test:integration:
+    desc: "运行集成测试"
+    cmds:
+      - go test -v ./test/integration/...
+
+  test:model:
+    desc: "运行 Model 层测试"
+    cmds:
+      - go test -v ./test/unit/model/...
+
+  test:controller:
+    desc: "运行 Controller 层测试"
+    cmds:
+      - go test -v ./test/unit/controller/...
+
+  test:all:
+    desc: "运行所有测试"
+    cmds:
+      - go test -v ./test/...
+
+  test:coverage:
+    desc: "运行测试并生成覆盖率报告"
+    cmds:
+      - go test -v -coverprofile=coverage.out ./test/...
+      - go tool cover -html=coverage.out -o coverage.html
+      - echo "覆盖率报告已生成: coverage.html"
+
+  test:benchmark:
+    desc: "运行性能基准测试"
+    cmds:
+      - go test -v -bench=. -benchmem ./test/...
+
+  test:race:
+    desc: "运行竞态条件检测测试"
+    cmds:
+      - go test -v -race ./test/...
+
+  test:mock:
+    desc: "使用 Mock 数据库运行测试"
+    env:
+      TEST_DB: mock
+    cmds:
+      - go test -v ./test/...
+
+  test:sqlite:
+    desc: "使用 SQLite 数据库运行测试"
+    env:
+      TEST_DB: sqlite
+    cmds:
+      - go test -v ./test/...
+
+  test:clean:
+    desc: "清理测试生成的文件"
+    cmds:
+      - rm -f coverage.out coverage.html
+      - rm -f test.db test.db-journal
+
   default:
     cmds:
       - task: build

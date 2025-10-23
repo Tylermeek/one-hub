@@ -26,6 +26,8 @@ var (
 type Token struct {
 	Id             int            `json:"id"`
 	UserId         int            `json:"user_id"`
+	OwnerType      string         `json:"owner_type" gorm:"type:varchar(10);default:'user'"` // "user" or "team"
+	OwnerId        int            `json:"owner_id" gorm:"default:0"`                          // user_id or team_id
 	Key            string         `json:"key" gorm:"type:varchar(59);uniqueIndex"`
 	Status         int            `json:"status" gorm:"default:1"`
 	Name           string         `json:"name" gorm:"index" `
@@ -91,6 +93,37 @@ type LimitsIPSetting struct {
 func GetUserTokensList(userId int, params *GenericParams) (*DataResult[Token], error) {
 	var tokens []*Token
 	db := DB.Where("user_id = ?", userId)
+
+	if params.Keyword != "" {
+		db = db.Where("name LIKE ?", params.Keyword+"%")
+	}
+
+	return PaginateAndOrder(db, &params.PaginationParams, &tokens, allowedTokenOrderFields)
+}
+
+// GetTokensByContext 按上下文查询 Token 列表
+func GetTokensByContext(contextType string, contextId int, userId int, params *GenericParams) (*DataResult[Token], error) {
+	var tokens []*Token
+	var db *gorm.DB
+	
+	// 权限检查：确保用户有权限访问该上下文的 Token
+	if contextType == "team" {
+		// 检查用户是否为团队成员
+		if !IsTeamMember(contextId, userId) {
+			return nil, errors.New("无权限访问该团队的 Token")
+		}
+		db = DB.Where("owner_type = ? AND owner_id = ?", contextType, contextId)
+	} else if contextType == "user" {
+		// 对于用户上下文，如果 contextId 为 0 或空，使用当前用户 ID
+		if contextId == 0 {
+			contextId = userId
+		} else if contextId != userId {
+			return nil, errors.New("无权限访问其他用户的 Token")
+		}
+		db = DB.Where("owner_type = ? AND owner_id = ?", contextType, contextId)
+	} else {
+		return nil, errors.New("无效的上下文类型")
+	}
 
 	if params.Keyword != "" {
 		db = db.Where("name LIKE ?", params.Keyword+"%")
@@ -228,6 +261,13 @@ func GetTokenByKey(key string) (*Token, error) {
 func (token *Token) Insert() error {
 	err := DB.Create(token).Error
 	return err
+}
+
+// InsertWithContext 创建 Token 并绑定到指定上下文
+func (token *Token) InsertWithContext(contextType string, contextId int) error {
+	token.OwnerType = contextType
+	token.OwnerId = contextId
+	return token.Insert()
 }
 
 // Update Make sure your token's fields is completed, because this will update non-zero values

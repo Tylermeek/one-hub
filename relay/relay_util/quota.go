@@ -32,6 +32,13 @@ type Quota struct {
 	tokenId          int
 	HandelStatus     bool
 
+	// 团队相关字段
+	teamId        int    // 团队ID（0表示非团队消费）
+	teamQuotaUsed int    // 预消费使用的团队额度
+	userQuotaUsed int    // 预消费使用的用户个人额度
+	contextType   string // 上下文类型："user" 或 "team"
+	contextId     int    // 上下文ID
+
 	startTime         time.Time
 	firstResponseTime time.Time
 	extraBillingData  map[string]ExtraBillingData
@@ -48,6 +55,9 @@ func NewQuota(c *gin.Context, modelName string, promptTokens int) *Quota {
 		tokenId:       c.GetInt("token_id"),
 		HandelStatus:  false,
 		isBackupGroup: isBackupGroup, // 记录是否使用备用分组
+		// 从请求头获取上下文信息
+		contextType:   c.GetString("context_type"),
+		contextId:     c.GetInt("context_id"),
 	}
 
 	quota.price = *model.PricingInstance.GetPrice(quota.modelName)
@@ -62,6 +72,7 @@ func NewQuota(c *gin.Context, modelName string, promptTokens int) *Quota {
 }
 
 func (q *Quota) PreQuotaConsumption() *types.OpenAIErrorWithStatusCode {
+	// 计算预消费额度
 	if q.price.Type == model.TimesPriceType {
 		q.preConsumedQuota = int(1000 * q.inputRatio)
 	} else if q.price.Input != 0 || q.price.Output != 0 {
@@ -72,6 +83,131 @@ func (q *Quota) PreQuotaConsumption() *types.OpenAIErrorWithStatusCode {
 		return nil
 	}
 
+	// 根据上下文类型进行额度消费
+	if q.contextType == "team" && q.contextId > 0 {
+		return q.consumeTeamContextQuota()
+	} else {
+		return q.consumeUserContextQuota()
+	}
+}
+
+func (q *Quota) consumeTeamContextQuota() *types.OpenAIErrorWithStatusCode {
+	// 检查是否为 Owner
+	if model.IsTeamOwner(q.contextId, q.userId) {
+		return q.consumeOwnerQuota()
+	} else {
+		return q.consumeMemberQuota()
+	}
+}
+
+func (q *Quota) consumeOwnerQuota() *types.OpenAIErrorWithStatusCode {
+	// Owner 直接扣除个人额度
+	userQuota, err := model.CacheGetUserQuota(q.userId)
+	if err != nil {
+		return common.ErrorWrapper(err, "get_user_quota_failed", http.StatusInternalServerError)
+	}
+
+	if userQuota < q.preConsumedQuota {
+		return common.ErrorWrapper(errors.New("owner quota is not enough"), "insufficient_owner_quota", http.StatusPaymentRequired)
+	}
+
+	err = model.CacheDecreaseUserQuota(q.userId, q.preConsumedQuota)
+	if err != nil {
+		return common.ErrorWrapper(err, "decrease_user_quota_failed", http.StatusInternalServerError)
+	}
+
+	// 同时累计团队已用额度
+	err = model.IncreaseTeamUsedQuota(q.contextId, q.preConsumedQuota)
+	if err != nil {
+		// 如果团队额度累计失败，回滚用户额度
+		model.CacheIncreaseUserQuota(q.userId, q.preConsumedQuota)
+		return common.ErrorWrapper(err, "increase_team_used_quota_failed", http.StatusInternalServerError)
+	}
+
+	// 标记为团队消费
+	q.teamId = q.contextId
+	q.userQuotaUsed = q.preConsumedQuota
+	q.teamQuotaUsed = q.preConsumedQuota
+
+	return nil
+}
+
+func (q *Quota) consumeMemberQuota() *types.OpenAIErrorWithStatusCode {
+	// 获取团队信息
+	team, err := model.GetTeamById(q.contextId)
+	if err != nil {
+		return common.ErrorWrapper(err, "get_team_failed", http.StatusInternalServerError)
+	}
+
+	if team.Status != 1 {
+		return common.ErrorWrapper(errors.New("team is disabled"), "team_disabled", http.StatusForbidden)
+	}
+
+	// 获取 Owner 信息用于校验
+	owner, err := model.GetUserById(team.OwnerId, false)
+	if err != nil {
+		return common.ErrorWrapper(err, "get_owner_failed", http.StatusInternalServerError)
+	}
+
+	// 校验 Owner 实际余额（所有团队都需要）
+	ownerAvailableQuota := owner.Quota - owner.UsedQuota
+	if ownerAvailableQuota < q.preConsumedQuota {
+		return common.ErrorWrapper(errors.New("owner wallet insufficient"), "insufficient_owner_wallet", http.StatusPaymentRequired)
+	}
+
+	if team.UnlimitedQuota {
+		// 无限额度团队：仅校验 Owner 余额，从 Owner 扣除
+		ownerQuota, err := model.CacheGetUserQuota(team.OwnerId)
+		if err != nil {
+			return common.ErrorWrapper(err, "get_owner_quota_failed", http.StatusInternalServerError)
+		}
+
+		if ownerQuota < q.preConsumedQuota {
+			return common.ErrorWrapper(errors.New("team owner quota is not enough"), "insufficient_team_quota", http.StatusPaymentRequired)
+		}
+
+		err = model.CacheDecreaseUserQuota(team.OwnerId, q.preConsumedQuota)
+		if err != nil {
+			return common.ErrorWrapper(err, "decrease_owner_quota_failed", http.StatusInternalServerError)
+		}
+
+		// 同时累计团队已用额度
+		err = model.IncreaseTeamUsedQuota(q.contextId, q.preConsumedQuota)
+		if err != nil {
+			// 如果团队额度累计失败，回滚 Owner 额度
+			model.CacheIncreaseUserQuota(team.OwnerId, q.preConsumedQuota)
+			return common.ErrorWrapper(err, "increase_team_used_quota_failed", http.StatusInternalServerError)
+		}
+
+		q.teamId = q.contextId
+		q.teamQuotaUsed = q.preConsumedQuota
+		q.userQuotaUsed = 0
+	} else {
+		// 有限额度团队：双重校验
+		// 第一层：团队上限校验
+		availableTeamQuota := team.Quota - team.UsedQuota
+		if availableTeamQuota < q.preConsumedQuota {
+			return common.ErrorWrapper(errors.New("team quota limit exceeded"), "team_quota_limit_exceeded", http.StatusPaymentRequired)
+		}
+
+		// 第二层：Owner 实际余额校验（已在上面完成）
+
+		// 扣除团队额度
+		err = model.IncreaseTeamUsedQuota(q.contextId, q.preConsumedQuota)
+		if err != nil {
+			return common.ErrorWrapper(err, "increase_team_used_quota_failed", http.StatusInternalServerError)
+		}
+
+		q.teamId = q.contextId
+		q.teamQuotaUsed = q.preConsumedQuota
+		q.userQuotaUsed = 0
+	}
+
+	return nil
+}
+
+func (q *Quota) consumeUserContextQuota() *types.OpenAIErrorWithStatusCode {
+	// 个人上下文，保持原有逻辑
 	userQuota, err := model.CacheGetUserQuota(q.userId)
 	if err != nil {
 		return common.ErrorWrapper(err, "get_user_quota_failed", http.StatusInternalServerError)
@@ -87,10 +223,7 @@ func (q *Quota) PreQuotaConsumption() *types.OpenAIErrorWithStatusCode {
 	}
 
 	if userQuota > 100*q.preConsumedQuota {
-		// in this case, we do not pre-consume quota
-		// because the user has enough quota
 		q.preConsumedQuota = 0
-		// common.LogInfo(c.Request.Context(), fmt.Sprintf("user %d has enough quota %d, trusted and no need to pre-consume", userId, userQuota))
 	}
 
 	if q.preConsumedQuota > 0 {
@@ -145,48 +278,130 @@ func (q *Quota) completedQuotaConsumption(usage *types.Usage, tokenName string, 
 
 	if quota > 0 {
 		quotaDelta := quota - q.preConsumedQuota
-		err := model.PostConsumeTokenQuota(q.tokenId, quotaDelta)
-		if err != nil {
-			return errors.New("error consuming token remain quota: " + err.Error())
+		
+		if q.teamId > 0 {
+			// 处理团队消费的额度差异
+			if quotaDelta != 0 {
+				if model.IsTeamOwner(q.teamId, q.userId) {
+					// Owner: 调整个人额度和团队已用额度
+					if quotaDelta > 0 {
+						model.DecreaseUserQuota(q.userId, quotaDelta)
+						model.IncreaseTeamUsedQuota(q.teamId, quotaDelta)
+					} else {
+						model.IncreaseUserQuota(q.userId, -quotaDelta)
+						model.DecreaseTeamUsedQuota(q.teamId, -quotaDelta)
+					}
+					model.CacheUpdateUserQuota(q.userId)
+				} else {
+					// 成员: 调整团队/Owner 额度和团队已用额度
+					team, _ := model.GetTeamById(q.teamId)
+					if team != nil && team.UnlimitedQuota {
+						// 无限额度团队，调整 Owner 个人额度和团队已用额度
+						if quotaDelta > 0 {
+							model.DecreaseUserQuota(team.OwnerId, quotaDelta)
+							model.IncreaseTeamUsedQuota(q.teamId, quotaDelta)
+						} else {
+							model.IncreaseUserQuota(team.OwnerId, -quotaDelta)
+							model.DecreaseTeamUsedQuota(q.teamId, -quotaDelta)
+						}
+						model.CacheUpdateUserQuota(team.OwnerId)
+					} else {
+						// 有限额度团队，调整团队已用额度
+						if quotaDelta > 0 {
+							model.IncreaseTeamUsedQuota(q.teamId, quotaDelta)
+						} else {
+							model.DecreaseTeamUsedQuota(q.teamId, -quotaDelta)
+						}
+					}
+				}
+			}
+			
+			// 记录团队消费日志
+			model.RecordConsumeLogWithTeam(
+				ctx,
+				q.userId,
+				q.channelId,
+				usage.PromptTokens,
+				usage.CompletionTokens,
+				q.modelName,
+				tokenName,
+				quota,
+				"",
+				q.getRequestTime(),
+				isStream,
+				q.GetLogMeta(usage),
+				sourceIp,
+				q.teamId,
+			)
+		} else {
+			// 个人消费，使用原有逻辑
+			err := model.PostConsumeTokenQuota(q.tokenId, quotaDelta)
+			if err != nil {
+				return errors.New("error consuming token remain quota: " + err.Error())
+			}
+			err = model.CacheUpdateUserQuota(q.userId)
+			if err != nil {
+				return errors.New("error consuming token remain quota: " + err.Error())
+			}
+			
+			model.RecordConsumeLog(
+				ctx,
+				q.userId,
+				q.channelId,
+				usage.PromptTokens,
+				usage.CompletionTokens,
+				q.modelName,
+				tokenName,
+				quota,
+				"",
+				q.getRequestTime(),
+				isStream,
+				q.GetLogMeta(usage),
+				sourceIp,
+			)
 		}
-		err = model.CacheUpdateUserQuota(q.userId)
-		if err != nil {
-			return errors.New("error consuming token remain quota: " + err.Error())
-		}
+		
 		model.UpdateChannelUsedQuota(q.channelId, quota)
 	}
 
-	model.RecordConsumeLog(
-		ctx,
-		q.userId,
-		q.channelId,
-		usage.PromptTokens,
-		usage.CompletionTokens,
-		q.modelName,
-		tokenName,
-		quota,
-		"",
-		q.getRequestTime(),
-		isStream,
-		q.GetLogMeta(usage),
-		sourceIp,
-	)
 	model.UpdateUserUsedQuotaAndRequestCount(q.userId, quota)
 
 	return nil
 }
 
 func (q *Quota) Undo(c *gin.Context) {
-	tokenId := c.GetInt("token_id")
-	if q.HandelStatus {
-		go func(ctx context.Context) {
-			// return pre-consumed quota
+	if q.preConsumedQuota == 0 {
+		return
+	}
+
+	go func(ctx context.Context) {
+		if q.teamId > 0 {
+			// 团队上下文：统一对 team.used_quota 做反向冲正
+			if model.IsTeamOwner(q.teamId, q.userId) {
+				// Owner: 退还个人额度和团队已用额度
+				model.IncreaseUserQuota(q.userId, q.preConsumedQuota)
+				model.DecreaseTeamUsedQuota(q.teamId, q.preConsumedQuota)
+				model.CacheUpdateUserQuota(q.userId)
+			} else {
+				// 成员: 退还团队/Owner 额度和团队已用额度
+				team, _ := model.GetTeamById(q.teamId)
+				if team != nil && team.UnlimitedQuota {
+					model.IncreaseUserQuota(team.OwnerId, q.preConsumedQuota)
+					model.DecreaseTeamUsedQuota(q.teamId, q.preConsumedQuota)
+					model.CacheUpdateUserQuota(team.OwnerId)
+				} else {
+					model.DecreaseTeamUsedQuota(q.teamId, q.preConsumedQuota)
+				}
+			}
+		} else if q.HandelStatus {
+			// 个人上下文，原有逻辑
+			tokenId := c.GetInt("token_id")
 			err := model.PostConsumeTokenQuota(tokenId, -q.preConsumedQuota)
 			if err != nil {
 				logger.LogError(ctx, "error return pre-consumed quota: "+err.Error())
 			}
-		}(c.Request.Context())
-	}
+		}
+	}(c.Request.Context())
 }
 
 func (q *Quota) Consume(c *gin.Context, usage *types.Usage, isStream bool) {

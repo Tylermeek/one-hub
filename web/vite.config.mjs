@@ -3,11 +3,12 @@ import path from 'path';
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import jsconfigPaths from 'vite-jsconfig-paths';
+import tailwindcss from '@tailwindcss/vite';
 
 // ----------------------------------------------------------------------
 
 export default defineConfig({
-  plugins: [react(), jsconfigPaths()],
+  plugins: [react(), tailwindcss(), jsconfigPaths()],
   // https://github.com/jpuri/react-draft-wysiwyg/issues/1317
   //   define: {
   //     global: 'window'
@@ -21,6 +22,10 @@ export default defineConfig({
       {
         find: /^src(.+)/,
         replacement: path.join(process.cwd(), 'src/$1')
+      },
+      {
+        find: '@',
+        replacement: path.resolve(process.cwd(), 'src')
       }
     ]
   },

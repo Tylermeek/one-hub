@@ -6,19 +6,19 @@ import Box from '@mui/material/Box';
 // ----------------------------------------------------------------------
 
 const Iconify = forwardRef(({ width = 20, sx, ...other }, ref) => (
-  <Box
-    ssr
-    ref={ref}
-    component={Icon}
-    sx={{
-      width,
-      height: width,
-      flexShrink: 0,
-      display: 'inline-flex',
-      ...sx
-    }}
-    {...other}
-  />
+    <Box
+        ssr
+        ref={ref}
+        component={Icon}
+        sx={{
+            width,
+            height: width,
+            flexShrink: 0,
+            display: 'inline-flex',
+            ...sx
+        }}
+        {...other}
+    />
 ));
 
 disableCache('local');

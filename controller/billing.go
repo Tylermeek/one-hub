@@ -27,34 +27,14 @@ func GetSubscription(c *gin.Context) {
 	if token.UnlimitedQuota {
 		userId := c.GetInt("id")
 		
-		// 检查用户是否有团队
-		teamId, err := model.GetUserTeamForConsumption(userId)
-		if err == nil && teamId > 0 {
-			// 用户有团队，计算团队+个人额度
-			totalAvailable, unlimited, err := model.GetUserTotalAvailableQuota(userId)
-			if err == nil {
-				if unlimited {
-					remainQuota = 999999999 // 表示无限额度
-				} else {
-					remainQuota = totalAvailable
-				}
-			}
-			
-			// 获取用户已用额度
-			userData, err := model.GetUserFields(userId, []string{"used_quota"})
-			if err == nil {
-				usedQuota = userData["used_quota"].(int)
-			}
-		} else {
-			// 用户没有团队，使用原有逻辑
-			userData, err := model.GetUserFields(userId, []string{"quota", "used_quota"})
-			if err != nil {
-				common.APIRespondWithError(c, http.StatusOK, fmt.Errorf("获取用户信息失败: %v", err))
-				return
-			}
-			remainQuota = userData["quota"].(int)
-			usedQuota = userData["used_quota"].(int)
+		// 简化逻辑，token.UnlimitedQuota 时使用用户个人额度
+		userData, err := model.GetUserFields(userId, []string{"quota", "used_quota"})
+		if err != nil {
+			common.APIRespondWithError(c, http.StatusOK, fmt.Errorf("获取用户信息失败: %v", err))
+			return
 		}
+		remainQuota = userData["quota"].(int)
+		usedQuota = userData["used_quota"].(int)
 	} else {
 		expiredTime = token.ExpiredTime
 		remainQuota = token.RemainQuota
@@ -97,23 +77,13 @@ func GetUsage(c *gin.Context) {
 	if token.UnlimitedQuota {
 		userId := c.GetInt("id")
 		
-		// 检查用户是否有团队
-		teamId, err := model.GetUserTeamForConsumption(userId)
-		if err == nil && teamId > 0 {
-			// 用户有团队，获取用户已用额度（团队使用量已包含在用户使用量中）
-			userData, err := model.GetUserFields(userId, []string{"used_quota"})
-			if err == nil {
-				quota = userData["used_quota"].(int)
-			}
-		} else {
-			// 用户没有团队，使用原有逻辑
-			userData, err := model.GetUserFields(userId, []string{"used_quota"})
-			if err != nil {
-				common.APIRespondWithError(c, http.StatusOK, fmt.Errorf("获取用户信息失败: %v", err))
-				return
-			}
-			quota = userData["used_quota"].(int)
+		// 简化逻辑，获取用户已用额度
+		userData, err := model.GetUserFields(userId, []string{"used_quota"})
+		if err != nil {
+			common.APIRespondWithError(c, http.StatusOK, fmt.Errorf("获取用户信息失败: %v", err))
+			return
 		}
+		quota = userData["used_quota"].(int)
 	} else {
 		quota = token.UsedQuota
 	}

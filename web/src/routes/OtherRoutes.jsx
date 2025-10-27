@@ -21,80 +21,80 @@ const Playground = Loadable(lazy(() => import('views/Playground')));
 const ModelPrice = Loadable(lazy(() => import('views/ModelPrice')));
 
 const WithMargins = ({ children }) => (
-  <Box
-    sx={{
-      maxWidth: '1200px',
-      margin: '0 auto',
-      padding: { xs: 0, sm: '0 24px' }
-    }}
-  >
-    {children}
-  </Box>
+    <Box
+        sx={{
+            maxWidth: '1200px',
+            margin: '0 auto',
+            padding: { xs: 0, sm: '0 24px' }
+        }}
+    >
+        {children}
+    </Box>
 );
 
 // ==============================|| AUTHENTICATION ROUTING ||============================== //
 
 const OtherRoutes = {
-  path: '/',
-  element: <MinimalLayout />,
-  children: [
-    {
-      path: '',
-      element: <Home />
-    },
-    {
-      path: '/about',
-      element: <About />
-    },
-    {
-      path: '/login',
-      element: <AuthLogin />
-    },
-    {
-      path: '/register',
-      element: <AuthRegister />
-    },
-    {
-      path: '/reset',
-      element: <ForgetPassword />
-    },
-    {
-      path: '/user/reset',
-      element: <ResetPassword />
-    },
-    {
-      path: '/oauth/github',
-      element: <GitHubOAuth />
-    },
-    {
-      path: '/oauth/oidc',
-      element: <OIDCOAuth />
-    },
-    {
-      path: '/oauth/lark',
-      element: <LarkOAuth />
-    },
-    {
-      path: '/404',
-      element: <NotFoundView />
-    },
-    {
-      path: '/jump',
-      element: <Jump />
-    },
-    {
-      path: '/playground',
-      element: <Playground />
-    },
-    {
-      path: '/price',
-      element: (
-        <WithMargins>
-          <ModelPrice />
-        </WithMargins>
-      )
-    }
-  ]
+    path: '/',
+    element: <MinimalLayout />,
+    children: [
+        {
+            path: '',
+            element: <Home />
+        },
+        {
+            path: '/about',
+            element: <About />
+        },
+        {
+            path: '/login',
+            element: <AuthLogin />
+        },
+        {
+            path: '/register',
+            element: <AuthRegister />
+        },
+        {
+            path: '/reset',
+            element: <ForgetPassword />
+        },
+        {
+            path: '/user/reset',
+            element: <ResetPassword />
+        },
+        {
+            path: '/oauth/github',
+            element: <GitHubOAuth />
+        },
+        {
+            path: '/oauth/oidc',
+            element: <OIDCOAuth />
+        },
+        {
+            path: '/oauth/lark',
+            element: <LarkOAuth />
+        },
+        {
+            path: '/404',
+            element: <NotFoundView />
+        },
+        {
+            path: '/jump',
+            element: <Jump />
+        },
+        {
+            path: '/playground',
+            element: <Playground />
+        },
+        {
+            path: '/price',
+            element: (
+                <WithMargins>
+                    <ModelPrice />
+                </WithMargins>
+            )
+        }
+    ]
 };
 
 export default OtherRoutes;

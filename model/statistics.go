@@ -173,7 +173,8 @@ func UpdateStatistics(updateType StatisticsUpdateType) error {
 		request_time = VALUES(request_time)`
 	}
 	now := time.Now()
-	todayTimestamp := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location()).Unix()
+	// 使用UTC时区计算时间戳，确保与created_at字段的时区一致
+	todayTimestamp := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC).Unix()
 
 	switch updateType {
 	case StatisticsUpdateTypeToDay:
@@ -181,6 +182,8 @@ func UpdateStatistics(updateType StatisticsUpdateType) error {
 	case StatisticsUpdateTypeYesterday:
 		yesterdayTimestamp := todayTimestamp - 86400
 		sqlWhere = fmt.Sprintf("AND created_at >= %d AND created_at < %d", yesterdayTimestamp, todayTimestamp)
+	case StatisticsUpdateTypeALL:
+		sqlWhere = "" // 处理所有数据，不添加时间限制
 	}
 
 	err := DB.Exec(fmt.Sprintf(sql, sqlPrefix, sqlDate, sqlWhere, sqlSuffix)).Error

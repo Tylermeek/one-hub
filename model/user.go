@@ -49,9 +49,7 @@ type User struct {
 	DeletedAt        gorm.DeletedAt `json:"-" gorm:"index"`
 
 	// 计算字段（不存储到数据库）
-	TotalAvailableQuota int  `json:"total_available_quota" gorm:"-"`  // 总可用额度（个人+团队）
-	HasUnlimitedTeam    bool `json:"has_unlimited_team" gorm:"-"`     // 是否有无限额度团队
-	TeamCount           int  `json:"team_count" gorm:"-"`             // 所属团队数量
+	TeamCount int `json:"team_count" gorm:"-"` // 所属团队数量
 }
 
 type UserUpdates func(*User)
@@ -662,40 +660,3 @@ func SaveWebAuthnCredential(userId int, credential *webauthn.Credential, alias s
 	return DB.Create(&webauthnCred).Error
 }
 
-// GetUserTotalAvailableQuota - 计算用户总可用额度（个人额度 + 团队额度）
-// 返回：总可用额度，是否无限额度，错误
-func GetUserTotalAvailableQuota(userId int) (int, bool, error) {
-	// 获取用户信息
-	user, err := GetUserById(userId, false)
-	if err != nil {
-		return 0, false, err
-	}
-
-	// 获取用户所属的团队
-	teamIds, err := GetUserTeamIds(userId)
-	if err != nil {
-		return 0, false, err
-	}
-
-	totalAvailableQuota := user.Quota // 个人可用额度
-	hasUnlimitedTeam := false
-
-	// 计算团队可用额度
-	for _, teamId := range teamIds {
-		availableQuota, unlimited, err := GetMemberAvailableQuota(teamId, userId)
-		if err == nil {
-			if unlimited {
-				hasUnlimitedTeam = true
-			} else {
-				totalAvailableQuota += availableQuota
-			}
-		}
-	}
-
-	// 如果有无限额度的团队，返回无限
-	if hasUnlimitedTeam {
-		return 0, true, nil
-	}
-
-	return totalAvailableQuota, false, nil
-}

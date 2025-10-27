@@ -200,19 +200,13 @@ func GetUsersList(c *gin.Context) {
 		return
 	}
 
-	// 为每个用户计算团队额度信息
+	// 为每个用户计算团队数量
 	if users.Data != nil {
 		for _, user := range *users.Data {
-			totalAvailableQuota, unlimited, err := model.GetUserTotalAvailableQuota(user.Id)
+			// 获取团队数量
+			teamIds, err := model.GetUserTeamIds(user.Id)
 			if err == nil {
-				user.TotalAvailableQuota = totalAvailableQuota
-				user.HasUnlimitedTeam = unlimited
-				
-				// 获取团队数量
-				teamIds, err := model.GetUserTeamIds(user.Id)
-				if err == nil {
-					user.TeamCount = len(teamIds)
-				}
+				user.TeamCount = len(teamIds)
 			}
 		}
 	}
@@ -345,6 +339,89 @@ func GetUserDashboard(c *gin.Context) {
 	})
 }
 
+func GetUserDashboardRecentLogs(c *gin.Context) {
+	id := c.GetInt("id")
+	
+	// 获取上下文信息
+	contextType := c.GetString("context_type")
+	contextId := c.GetInt("context_id")
+	
+	// 根据上下文类型确定 teamId
+	var teamId int
+	if contextType == "team" {
+		// 检查用户是否为团队成员
+		if !model.IsTeamMember(contextId, id) {
+			c.JSON(http.StatusOK, gin.H{
+				"success": false,
+				"message": "无权限访问该团队的日志信息",
+			})
+			return
+		}
+		teamId = contextId
+	} else {
+		// 个人空间，teamId = 0
+		teamId = 0
+	}
+
+	// 解析查询参数
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "10"))
+	timeRange := c.DefaultQuery("time_range", "7d")
+
+	// 计算时间范围
+	now := time.Now()
+	var startTimestamp int64
+	switch timeRange {
+	case "30d":
+		startTimestamp = now.AddDate(0, 0, -30).Unix()
+	case "90d":
+		startTimestamp = now.AddDate(0, 0, -90).Unix()
+	default: // 7d
+		startTimestamp = now.AddDate(0, 0, -7).Unix()
+	}
+
+	// 构建查询参数
+	var params model.LogsListParams
+	params.UserId = id
+	params.TeamId = teamId
+	params.StartTimestamp = startTimestamp
+	params.EndTimestamp = now.Unix()
+	params.Page = page
+	params.Size = pageSize
+
+	// 获取日志数据
+	logs, err := model.GetUserLogsListWithTeamFilter(id, teamId, &params)
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"success": false,
+			"message": "无法获取日志信息",
+		})
+		return
+	}
+
+	// 计算总数 - 使用单独的查询来获取总数，避免size限制
+	totalParams := params
+	totalParams.Page = 1
+	totalParams.Size = 1 // 只需要获取总数，不需要实际数据
+	totalLogs, err := model.GetUserLogsListWithTeamFilter(id, teamId, &totalParams)
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"success": false,
+			"message": fmt.Sprintf("无法获取日志总数: %v (userId=%d, teamId=%d)", err, id, teamId),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"message": "",
+		"data": gin.H{
+			"items": logs.Data,
+			"total": totalLogs.TotalCount,
+		},
+	})
+}
+
 func GenerateAccessToken(c *gin.Context) {
 	id := c.GetInt("id")
 	user, err := model.GetUserById(id, true)
@@ -418,24 +495,12 @@ func GetSelf(c *gin.Context) {
 		return
 	}
 
-	// 计算用户总可用额度
-	totalAvailableQuota, unlimited, err := model.GetUserTotalAvailableQuota(id)
-	if err != nil {
-		// 如果计算出错，设置默认值
-		user.TotalAvailableQuota = user.Quota
-		user.HasUnlimitedTeam = false
-		user.TeamCount = 0
+	// 获取团队数量
+	teamIds, err := model.GetUserTeamIds(id)
+	if err == nil {
+		user.TeamCount = len(teamIds)
 	} else {
-		user.TotalAvailableQuota = totalAvailableQuota
-		user.HasUnlimitedTeam = unlimited
-		
-		// 获取团队数量
-		teamIds, err := model.GetUserTeamIds(id)
-		if err == nil {
-			user.TeamCount = len(teamIds)
-		} else {
-			user.TeamCount = 0
-		}
+		user.TeamCount = 0
 	}
 
 	c.JSON(http.StatusOK, gin.H{
@@ -493,7 +558,6 @@ func GetContextQuota(c *gin.Context) {
 			// 有限团队：基准额度 = team.quota，used_quota = team.used_quota
 			quota = team.Quota
 			usedQuota = team.UsedQuota
-			unlimited = false
 		}
 	} else {
 		// 个人空间：quota = user.quota，used_quota = user.used_quota
@@ -508,7 +572,6 @@ func GetContextQuota(c *gin.Context) {
 		}
 		quota = user.Quota
 		usedQuota = user.UsedQuota
-		unlimited = false
 	}
 	
 	available := quota - usedQuota
@@ -562,6 +625,287 @@ func GetUserContexts(c *gin.Context) {
 		"success": true,
 		"message": "",
 		"data":    contexts,
+	})
+}
+
+// GetUserDashboardSummary 获取用户 Dashboard 汇总数据
+func GetUserDashboardSummary(c *gin.Context) {
+	userId := c.GetInt("id")
+	
+	// 获取上下文信息
+	contextType := c.GetString("context_type")
+	contextId := c.GetInt("context_id")
+	
+	// 根据上下文类型确定 teamId
+	var teamId int
+	if contextType == "team" {
+		// 检查用户是否为团队成员
+		if !model.IsTeamMember(contextId, userId) {
+			c.JSON(http.StatusOK, gin.H{
+				"success": false,
+				"message": "无权限访问该团队的统计信息",
+			})
+			return
+		}
+		teamId = contextId
+	} else {
+		// 个人空间，teamId = 0
+		teamId = 0
+	}
+
+	now := time.Now()
+	
+	// 计算时间范围
+	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+	weekStart := today.AddDate(0, 0, -6) // 最近7天
+	monthStart := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location())
+	
+	// 格式化日期
+	todayStr := today.Format("2006-01-02")
+	weekStartStr := weekStart.Format("2006-01-02")
+	monthStartStr := monthStart.Format("2006-01-02")
+	
+	// 获取今日统计
+	todayStats, err := model.GetUserModelStatisticsByContext(userId, teamId, todayStr, todayStr)
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"success": false,
+			"message": "获取今日统计失败: " + err.Error(),
+		})
+		return
+	}
+	
+	// 获取本周统计
+	weekStats, err := model.GetUserModelStatisticsByContext(userId, teamId, weekStartStr, todayStr)
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"success": false,
+			"message": "获取本周统计失败: " + err.Error(),
+		})
+		return
+	}
+	
+	// 获取本月统计
+	monthStats, err := model.GetUserModelStatisticsByContext(userId, teamId, monthStartStr, todayStr)
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"success": false,
+			"message": "获取本月统计失败: " + err.Error(),
+		})
+		return
+	}
+	
+	// 聚合统计数据
+	aggregateStats := func(stats []*model.LogStatisticGroupModel) (int64, int64, int64) {
+		var requests, quota, tokens int64
+		for _, stat := range stats {
+			requests += stat.RequestCount
+			quota += stat.Quota
+			tokens += stat.PromptTokens + stat.CompletionTokens
+		}
+		return requests, quota, tokens
+	}
+	
+	todayRequests, todayQuota, todayTokens := aggregateStats(todayStats)
+	weekRequests, weekQuota, weekTokens := aggregateStats(weekStats)
+	monthRequests, monthQuota, monthTokens := aggregateStats(monthStats)
+	
+	// 计算热门模型 Top 5
+	modelUsage := make(map[string]int64)
+	for _, stat := range weekStats {
+		modelUsage[stat.ModelName] += stat.RequestCount
+	}
+	
+	// 排序并取前5
+	type ModelCount struct {
+		Name  string `json:"name"`
+		Count int64  `json:"count"`
+		Quota int64  `json:"quota"`
+	}
+	
+	var topModels []ModelCount
+	for modelName, count := range modelUsage {
+		var quota int64
+		for _, stat := range weekStats {
+			if stat.ModelName == modelName {
+				quota += stat.Quota
+			}
+		}
+		topModels = append(topModels, ModelCount{
+			Name:  modelName,
+			Count: count,
+			Quota: quota,
+		})
+	}
+	
+	// 按请求数排序
+	for i := 0; i < len(topModels)-1; i++ {
+		for j := i + 1; j < len(topModels); j++ {
+			if topModels[i].Count < topModels[j].Count {
+				topModels[i], topModels[j] = topModels[j], topModels[i]
+			}
+		}
+	}
+	
+	// 取前5个
+	if len(topModels) > 5 {
+		topModels = topModels[:5]
+	}
+	
+	// 生成最近7天趋势数据
+	var dailyTrend []gin.H
+	for i := 6; i >= 0; i-- {
+		date := today.AddDate(0, 0, -i)
+		dateStr := date.Format("2006-01-02")
+		
+		dayStats, err := model.GetUserModelStatisticsByContext(userId, teamId, dateStr, dateStr)
+		if err != nil {
+			continue
+		}
+		
+		dayRequests, dayQuota, _ := aggregateStats(dayStats)
+		dailyTrend = append(dailyTrend, gin.H{
+			"date":     dateStr,
+			"requests": dayRequests,
+			"quota":    dayQuota,
+		})
+	}
+	
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"message": "",
+		"data": gin.H{
+			"today": gin.H{
+				"requests": todayRequests,
+				"quota":    todayQuota,
+				"tokens":   todayTokens,
+			},
+			"week": gin.H{
+				"requests": weekRequests,
+				"quota":    weekQuota,
+				"tokens":   weekTokens,
+			},
+			"month": gin.H{
+				"requests": monthRequests,
+				"quota":    monthQuota,
+				"tokens":   monthTokens,
+			},
+			"top_models":   topModels,
+			"daily_trend":  dailyTrend,
+		},
+	})
+}
+
+// GetQuotaAlert 获取额度预警信息
+func GetQuotaAlert(c *gin.Context) {
+	userId := c.GetInt("id")
+	contextType := c.GetString("context_type")
+	contextId := c.GetInt("context_id")
+	
+	var quota, usedQuota int
+	
+	if contextType == "team" {
+		// 检查用户是否为团队成员
+		if !model.IsTeamMember(contextId, userId) {
+			c.JSON(http.StatusOK, gin.H{
+				"success": false,
+				"message": "无权限访问该团队的额度信息",
+			})
+			return
+		}
+		
+		team, err := model.GetTeamById(contextId)
+		if err != nil {
+			c.JSON(http.StatusOK, gin.H{
+				"success": false,
+				"message": err.Error(),
+			})
+			return
+		}
+		
+		if team.UnlimitedQuota {
+			owner, err := model.GetUserById(team.OwnerId, false)
+			if err != nil {
+				c.JSON(http.StatusOK, gin.H{
+					"success": false,
+					"message": err.Error(),
+				})
+				return
+			}
+			quota = owner.Quota
+			usedQuota = team.UsedQuota
+		} else {
+			quota = team.Quota
+			usedQuota = team.UsedQuota
+		}
+	} else {
+		user, err := model.GetUserById(userId, false)
+		if err != nil {
+			c.JSON(http.StatusOK, gin.H{
+				"success": false,
+				"message": err.Error(),
+			})
+			return
+		}
+		quota = user.Quota
+		usedQuota = user.UsedQuota
+	}
+	
+	// 计算使用率
+	usageRate := 0.0
+	if quota > 0 {
+		usageRate = float64(usedQuota) / float64(quota) * 100
+	}
+	
+	// 计算最近7天平均消费
+	now := time.Now()
+	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+	weekStart := today.AddDate(0, 0, -6)
+	
+	weekStartStr := weekStart.Format("2006-01-02")
+	todayStr := today.Format("2006-01-02")
+	
+	var teamId int
+	if contextType == "team" {
+		teamId = contextId
+	} else {
+		teamId = 0
+	}
+	
+	weekStats, err := model.GetUserModelStatisticsByContext(userId, teamId, weekStartStr, todayStr)
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"success": false,
+			"message": "获取消费统计失败: " + err.Error(),
+		})
+		return
+	}
+	
+	var totalQuota int64
+	for _, stat := range weekStats {
+		totalQuota += stat.Quota
+	}
+	
+	dailyAvg := float64(totalQuota) / 7.0
+	remainingQuota := quota - usedQuota
+	remainingDays := 0.0
+	
+	if dailyAvg > 0 && remainingQuota > 0 {
+		remainingDays = float64(remainingQuota) / dailyAvg
+	}
+	
+	alert := usageRate > 80.0
+	
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"message": "",
+		"data": gin.H{
+			"alert":          alert,
+			"usage_rate":     usageRate,
+			"remaining_days": remainingDays,
+			"daily_avg":      dailyAvg,
+			"remaining_quota": remainingQuota,
+		},
 	})
 }
 

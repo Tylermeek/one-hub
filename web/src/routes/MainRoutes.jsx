@@ -27,6 +27,8 @@ const Invoice = Loadable(lazy(() => import('views/Invoice')));
 const InvoiceDetail = Loadable(lazy(() => import('views/Invoice/detail')));
 const Team = Loadable(lazy(() => import('views/Team')));
 const TeamDetail = Loadable(lazy(() => import('views/Team/TeamDetail')));
+const TeamSettings = Loadable(lazy(() => import('views/Team/TeamSettings')));
+const TeamAnalytics = Loadable(lazy(() => import('views/Team/TeamAnalytics')));
 // dashboard routing
 const Dashboard = Loadable(lazy(() => import('views/Dashboard')));
 
@@ -35,114 +37,122 @@ const SystemInfo = Loadable(lazy(() => import('views/SystemInfo')));
 // ==============================|| MAIN ROUTING ||============================== //
 
 const MainRoutes = {
-  path: '/panel',
-  element: <MainLayout />,
-  children: [
-    {
-      path: '',
-      element: <Dashboard />
-    },
-    {
-      path: 'dashboard',
-      element: <Dashboard />
-    },
-    {
-      path: 'invoice',
-      element: <Invoice />
-    },
-    {
-      path: 'invoice/detail/:date',
-      element: <InvoiceDetail />
-    },
-    {
-      path: 'channel',
-      element: <Channel />
-    },
-    {
-      path: 'log',
-      element: <Log />
-    },
-    {
-      path: 'redemption',
-      element: <Redemption />
-    },
-    {
-      path: 'setting',
-      element: <Setting />
-    },
-    {
-      path: 'token',
-      element: <Token />
-    },
-    {
-      path: 'topup',
-      element: <Topup />
-    },
-    {
-      path: 'user',
-      element: <User />
-    },
-    {
-      path: 'profile',
-      element: <Profile />
-    },
-    {
-      path: 'analytics',
-      element: <Analytics />
-    },
-    {
-      path: '404',
-      element: <NotFoundView />
-    },
-    {
-      path: 'telegram',
-      element: <Telegram />
-    },
-    {
-      path: 'pricing',
-      element: <Pricing />
-    },
-    {
-      path: 'midjourney',
-      element: <Midjourney />
-    },
-    {
-      path: 'model_price',
-      element: <ModelPrice />
-    },
-    {
-      path: 'playground',
-      element: <Playground />
-    },
-    {
-      path: 'payment',
-      element: <Payment />
-    },
-    {
-      path: 'task',
-      element: <Task />
-    },
-    {
-      path: 'user_group',
-      element: <UserGroup />
-    },
-    {
-      path: 'model_ownedby',
-      element: <ModelOwnedby />
-    },
-    {
-      path: 'system_info',
-      element: <SystemInfo />
-    },
-    {
-      path: 'team',
-      element: <Team />
-    },
-    {
-      path: 'team/:id',
-      element: <TeamDetail />
-    }
-  ]
+    path: '/panel',
+    element: <MainLayout />,
+    children: [
+        {
+            path: '',
+            element: <Dashboard />
+        },
+        {
+            path: 'dashboard',
+            element: <Dashboard />
+        },
+        {
+            path: 'invoice',
+            element: <Invoice />
+        },
+        {
+            path: 'invoice/detail/:date',
+            element: <InvoiceDetail />
+        },
+        {
+            path: 'channel',
+            element: <Channel />
+        },
+        {
+            path: 'log',
+            element: <Log />
+        },
+        {
+            path: 'redemption',
+            element: <Redemption />
+        },
+        {
+            path: 'setting',
+            element: <Setting />
+        },
+        {
+            path: 'token',
+            element: <Token />
+        },
+        {
+            path: 'topup',
+            element: <Topup />
+        },
+        {
+            path: 'user',
+            element: <User />
+        },
+        {
+            path: 'profile',
+            element: <Profile />
+        },
+        {
+            path: 'analytics',
+            element: <Analytics />
+        },
+        {
+            path: '404',
+            element: <NotFoundView />
+        },
+        {
+            path: 'telegram',
+            element: <Telegram />
+        },
+        {
+            path: 'pricing',
+            element: <Pricing />
+        },
+        {
+            path: 'midjourney',
+            element: <Midjourney />
+        },
+        {
+            path: 'model_price',
+            element: <ModelPrice />
+        },
+        {
+            path: 'playground',
+            element: <Playground />
+        },
+        {
+            path: 'payment',
+            element: <Payment />
+        },
+        {
+            path: 'task',
+            element: <Task />
+        },
+        {
+            path: 'user_group',
+            element: <UserGroup />
+        },
+        {
+            path: 'model_ownedby',
+            element: <ModelOwnedby />
+        },
+        {
+            path: 'system_info',
+            element: <SystemInfo />
+        },
+        {
+            path: 'team',
+            element: <Team />
+        },
+        {
+            path: 'team/:id',
+            element: <TeamDetail />
+        },
+        {
+            path: 'team/:id/settings',
+            element: <TeamSettings />
+        },
+        {
+            path: 'team/:id/analytics',
+            element: <TeamAnalytics />
+        }
+    ]
 };
 
 export default MainRoutes;

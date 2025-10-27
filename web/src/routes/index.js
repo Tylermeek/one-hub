@@ -7,5 +7,5 @@ import OtherRoutes from './OtherRoutes';
 // ==============================|| ROUTING RENDER ||============================== //
 
 export default function ThemeRoutes() {
-  return useRoutes([MainRoutes, OtherRoutes]);
+    return useRoutes([MainRoutes, OtherRoutes]);
 }

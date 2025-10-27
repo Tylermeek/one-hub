@@ -75,7 +75,10 @@ func SetApiRouter(router *gin.Engine) {
 			selfRoute.Use(middleware.ContextMiddleware()) // 仅 Web 界面需要手动切换上下文
 			{
 				selfRoute.GET("/dashboard", controller.GetUserDashboard)
+				selfRoute.GET("/dashboard/summary", controller.GetUserDashboardSummary)
 				selfRoute.GET("/dashboard/rate", controller.GetRateRealtime)
+				selfRoute.GET("/dashboard/quota_alert", controller.GetQuotaAlert)
+				selfRoute.GET("/dashboard/recent-logs", controller.GetUserDashboardRecentLogs)
 				selfRoute.GET("/dashboard/uptimekuma/status-page", controller.UptimeKumaStatusPage)
 				selfRoute.GET("/dashboard/uptimekuma/status-page/heartbeat", controller.UptimeKumaStatusPageHeartbeat)
 				selfRoute.GET("/invoice", controller.GetUserInvoice)

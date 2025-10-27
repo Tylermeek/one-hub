@@ -6,7 +6,7 @@ import team from './team';
 // ==============================|| MENU ITEMS ||============================== //
 
 const menuItems = {
-  items: [Dashboard, team, Setting, Billing, usage]
+    items: [Dashboard, team, Setting, Billing, usage]
 };
 
 export default menuItems;

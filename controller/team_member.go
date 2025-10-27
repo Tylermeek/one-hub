@@ -98,7 +98,7 @@ func GetTeamMembers(c *gin.Context) {
 	
 	if model.IsTeamOwner(id, userId) {
 		isOwner = true
-		currentUserRole = 1 // Owner 视为管理员角色
+		currentUserRole = 0 // Owner
 	} else {
 		// 获取团队成员信息
 		member, err := model.GetTeamMember(id, userId)

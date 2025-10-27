@@ -9,7 +9,6 @@ import (
 	"io"
 	"net/http"
 	"one-api/common"
-	"one-api/common/logger"
 	"one-api/common/utils"
 	"one-api/types"
 	"strconv"

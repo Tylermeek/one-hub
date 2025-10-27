@@ -18,143 +18,143 @@ import { Icon } from '@iconify/react';
 import { useTranslation } from 'react-i18next';
 // ----------------------------------------------------------------------
 export default function ModelOwnedby() {
-  const { t } = useTranslation();
-  const [modelOwnedby, setModelOwnedby] = useState([]);
-  const [refreshFlag, setRefreshFlag] = useState(false);
+    const { t } = useTranslation();
+    const [modelOwnedby, setModelOwnedby] = useState([]);
+    const [refreshFlag, setRefreshFlag] = useState(false);
 
-  const [openModal, setOpenModal] = useState(false);
-  const [editId, setEditId] = useState(0);
+    const [openModal, setOpenModal] = useState(false);
+    const [editId, setEditId] = useState(0);
 
-  const fetchData = async () => {
-    try {
-      const res = await API.get(`/api/model_ownedby/`);
-      const { success, message, data } = res.data;
-      if (success) {
-        setModelOwnedby(data);
-      } else {
-        showError(message);
-      }
-    } catch (error) {
-      console.error(error);
-    }
-  };
+    const fetchData = async () => {
+        try {
+            const res = await API.get(`/api/model_ownedby/`);
+            const { success, message, data } = res.data;
+            if (success) {
+                setModelOwnedby(data);
+            } else {
+                showError(message);
+            }
+        } catch (error) {
+            console.error(error);
+        }
+    };
 
-  // 处理刷新
-  const handleRefresh = async () => {
-    setRefreshFlag(!refreshFlag);
-  };
+    // 处理刷新
+    const handleRefresh = async () => {
+        setRefreshFlag(!refreshFlag);
+    };
 
-  useEffect(() => {
-    fetchData();
-  }, [refreshFlag]);
+    useEffect(() => {
+        fetchData();
+    }, [refreshFlag]);
 
-  const manageModelOwnedBy = async (id, action) => {
-    const url = '/api/model_ownedby/';
-    let res;
-    try {
-      switch (action) {
-        case 'delete':
-          res = await API.delete(url + id);
-          break;
-        default:
-          return false;
-      }
+    const manageModelOwnedBy = async (id, action) => {
+        const url = '/api/model_ownedby/';
+        let res;
+        try {
+            switch (action) {
+                case 'delete':
+                    res = await API.delete(url + id);
+                    break;
+                default:
+                    return false;
+            }
 
-      const { success, message } = res.data;
-      if (success) {
-        showSuccess(t('userPage.operationSuccess'));
-        await handleRefresh();
-      } else {
-        showError(message);
-      }
+            const { success, message } = res.data;
+            if (success) {
+                showSuccess(t('userPage.operationSuccess'));
+                await handleRefresh();
+            } else {
+                showError(message);
+            }
 
-      return res.data;
-    } catch (error) {
-      return;
-    }
-  };
+            return res.data;
+        } catch (error) {
+            return;
+        }
+    };
 
-  const handleOpenModal = (userId) => {
-    setEditId(userId);
-    setOpenModal(true);
-  };
+    const handleOpenModal = (userId) => {
+        setEditId(userId);
+        setOpenModal(true);
+    };
 
-  const handleCloseModal = () => {
-    setOpenModal(false);
-    setEditId(0);
-  };
+    const handleCloseModal = () => {
+        setOpenModal(false);
+        setEditId(0);
+    };
 
-  const handleOkModal = (status) => {
-    if (status === true) {
-      handleCloseModal();
-      handleRefresh();
-    }
-  };
+    const handleOkModal = (status) => {
+        if (status === true) {
+            handleCloseModal();
+            handleRefresh();
+        }
+    };
 
-  return (
-    <>
-      <Stack direction="row" alignItems="center" justifyContent="space-between" mb={5}>
-        <Stack direction="column" spacing={1}>
-          <Typography variant="h2">{t('modelOwnedby.title')}</Typography>
-          <Typography variant="subtitle1" color="text.secondary">
-            Model Owned By
-          </Typography>
-        </Stack>
+    return (
+        <>
+            <Stack direction="row" alignItems="center" justifyContent="space-between" mb={5}>
+                <Stack direction="column" spacing={1}>
+                    <Typography variant="h2">{t('modelOwnedby.title')}</Typography>
+                    <Typography variant="subtitle1" color="text.secondary">
+                        Model Owned By
+                    </Typography>
+                </Stack>
 
-        <Button
-          variant="contained"
-          color="primary"
-          startIcon={<Icon icon="solar:add-circle-line-duotone" />}
-          onClick={() => handleOpenModal(0)}
-        >
-          {t('modelOwnedby.create')}
-        </Button>
-      </Stack>
-      <Card>
-        <Toolbar
-          sx={{
-            textAlign: 'right',
-            height: 50,
-            display: 'flex',
-            justifyContent: 'space-between',
-            p: (theme) => theme.spacing(0, 1, 0, 3)
-          }}
-        >
-          <Container maxWidth="xl">
-            <ButtonGroup variant="outlined" aria-label="outlined small primary button group">
-              <Button onClick={handleRefresh} startIcon={<Icon icon="solar:refresh-bold-duotone" width={18} />}>
-                {t('userPage.refresh')}
-              </Button>
-            </ButtonGroup>
-          </Container>
-        </Toolbar>
-        <PerfectScrollbar component="div">
-          <TableContainer sx={{ overflow: 'unset' }}>
-            <Table sx={{ minWidth: 800 }}>
-              <KeywordTableHead
-                headLabel={[
-                  { id: 'id', label: t('modelOwnedby.id'), disableSort: false },
-                  { id: 'name', label: t('modelOwnedby.name'), disableSort: false },
-                  { id: 'icon', label: t('modelOwnedby.icon'), disableSort: false },
-                  { id: 'action', label: t('modelOwnedby.action'), disableSort: true }
-                ]}
-              />
-              <TableBody>
-                {modelOwnedby.map((row) => (
-                  <ModelOwnedbyTableRow
-                    item={row}
-                    manageModelOwnedBy={manageModelOwnedBy}
-                    key={row.id}
-                    handleOpenModal={handleOpenModal}
-                    setModalId={setEditId}
-                  />
-                ))}
-              </TableBody>
-            </Table>
-          </TableContainer>
-        </PerfectScrollbar>
-      </Card>
-      <EditeModal open={openModal} onCancel={handleCloseModal} onOk={handleOkModal} Oid={editId} />
-    </>
-  );
+                <Button
+                    variant="contained"
+                    color="primary"
+                    startIcon={<Icon icon="solar:add-circle-line-duotone" />}
+                    onClick={() => handleOpenModal(0)}
+                >
+                    {t('modelOwnedby.create')}
+                </Button>
+            </Stack>
+            <Card>
+                <Toolbar
+                    sx={{
+                        textAlign: 'right',
+                        height: 50,
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        p: (theme) => theme.spacing(0, 1, 0, 3)
+                    }}
+                >
+                    <Container maxWidth="xl">
+                        <ButtonGroup variant="outlined" aria-label="outlined small primary button group">
+                            <Button onClick={handleRefresh} startIcon={<Icon icon="solar:refresh-bold-duotone" width={18} />}>
+                                {t('userPage.refresh')}
+                            </Button>
+                        </ButtonGroup>
+                    </Container>
+                </Toolbar>
+                <PerfectScrollbar component="div">
+                    <TableContainer sx={{ overflow: 'unset' }}>
+                        <Table sx={{ minWidth: 800 }}>
+                            <KeywordTableHead
+                                headLabel={[
+                                    { id: 'id', label: t('modelOwnedby.id'), disableSort: false },
+                                    { id: 'name', label: t('modelOwnedby.name'), disableSort: false },
+                                    { id: 'icon', label: t('modelOwnedby.icon'), disableSort: false },
+                                    { id: 'action', label: t('modelOwnedby.action'), disableSort: true }
+                                ]}
+                            />
+                            <TableBody>
+                                {modelOwnedby.map((row) => (
+                                    <ModelOwnedbyTableRow
+                                        item={row}
+                                        manageModelOwnedBy={manageModelOwnedBy}
+                                        key={row.id}
+                                        handleOpenModal={handleOpenModal}
+                                        setModalId={setEditId}
+                                    />
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </TableContainer>
+                </PerfectScrollbar>
+            </Card>
+            <EditeModal open={openModal} onCancel={handleCloseModal} onOk={handleOkModal} Oid={editId} />
+        </>
+    );
 }

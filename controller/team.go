@@ -48,11 +48,11 @@ func CreateTeam(c *gin.Context) {
 		return
 	}
 
-	// 自动将创建者添加为团队成员（管理员角色）
+	// 自动将创建者添加为团队成员（所有者角色）
 	member := &model.TeamMember{
 		TeamId: team.Id,
 		UserId: ownerId,
-		Role:   1, // 管理员
+		Role:   0, // 所有者
 		Status: 1, // 正常状态
 	}
 	if err := member.Insert(); err != nil {
@@ -94,7 +94,7 @@ func GetUserTeams(c *gin.Context) {
 		for _, team := range *teams.Data {
 			// 检查是否为团队所有者
 			if model.IsTeamOwner(team.Id, userId) {
-				team.CurrentUserRole = 1
+				team.CurrentUserRole = 0 // Owner
 				team.IsOwner = true
 			} else {
 				// 获取团队成员信息
@@ -152,6 +152,21 @@ func GetTeam(c *gin.Context) {
 		owner, err := model.GetUserById(team.OwnerId, false)
 		if err == nil {
 			team.OwnerBalance = owner.Quota
+		}
+	}
+
+	// 设置当前用户的角色信息
+	if model.IsTeamOwner(id, userId) {
+		team.IsOwner = true
+		team.CurrentUserRole = 0 // Owner
+	} else {
+		member, err := model.GetTeamMember(id, userId)
+		if err != nil {
+			team.CurrentUserRole = 2 // 默认为普通成员
+			team.IsOwner = false
+		} else {
+			team.CurrentUserRole = member.Role
+			team.IsOwner = false
 		}
 	}
 

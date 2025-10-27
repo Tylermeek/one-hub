@@ -1,418 +1,264 @@
-import { useEffect, useState } from 'react';
-import { Grid, Box, Stack, Typography, Button, Chip } from '@mui/material';
-import { gridSpacing } from 'store/constant';
-import StatisticalLineChartCard from './component/StatisticalLineChartCard';
-import ApexCharts from 'ui-component/chart/ApexCharts';
+import { useEffect, useState, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
+import { useSelector } from 'react-redux';
+
+// 导入新组件
+import MetricCard from './component/MetricCard';
+import WeeklyTrendChart from './component/WeeklyTrendChart';
+import QuotaAlertCard from './component/QuotaAlertCard';
+import TopModelsChart from './component/TopModelsChart';
+import QuickActionsCard from './component/QuickActionsCard';
+import ModelUsagePieChart from './component/ModelUsagePieChart';
 import SupportModels from './component/SupportModels';
-import { getLastSevenDays, generateBarChartOptions, renderChartNumber } from 'utils/chart';
+import QuickStartCard from './component/QuickStartCard';
+import InviteCard from './component/InviteCard';
+import StatusPanel from './component/StatusPanel';
+import RecentLogsTable from './component/RecentLogsTable';
+
+// 导入工具函数
 import { API } from 'utils/api';
 import { showError, calculateQuota } from 'utils/common';
-import ModelUsagePieChart from './component/ModelUsagePieChart';
-import { useTranslation } from 'react-i18next';
-import InviteCard from './component/InviteCard';
-import QuotaLogWeek from './component/QuotaLogWeek';
-import QuickStartCard from './component/QuickStartCard';
-import RPM from './component/RPM';
-import StatusPanel from './component/StatusPanel';
-import { useSelector } from 'react-redux';
-import useCustomContext from 'hooks/useContext';
-import { Icon } from '@iconify/react';
-
-// TabPanel component for tab content
-function TabPanel(props) {
-  const { children, value, index, ...other } = props;
-
-  return (
-    <div
-      role="tabpanel"
-      hidden={value !== index}
-      id={`dashboard-tabpanel-${index}`}
-      aria-labelledby={`dashboard-tab-${index}`}
-      {...other}
-    >
-      {value === index && (
-        <Box sx={{ pt: 3 }}>
-          {children}
-        </Box>
-      )}
-    </div>
-  );
-}
 
 const Dashboard = () => {
-  const [isLoading, setLoading] = useState(true);
-  const [statisticalData, setStatisticalData] = useState([]);
-  const [requestChart, setRequestChart] = useState(null);
-  const [quotaChart, setQuotaChart] = useState(null);
-  const [tokenChart, setTokenChart] = useState(null);
-  const { t } = useTranslation();
-  const [modelUsageData, setModelUsageData] = useState([]);
-  const [currentTab, setCurrentTab] = useState(0);
+    const [isLoading, setLoading] = useState(true);
+    const [summaryData, setSummaryData] = useState(null);
+    const [dashboardData, setDashboardData] = useState(null);
+    const [quotaData, setQuotaData] = useState(null);
+    const [rateData, setRateData] = useState(null);
 
-  const [dashboardData, setDashboardData] = useState(null);
-  const [quotaData, setQuotaData] = useState(null);
+    const { t } = useTranslation();
+    const siteInfo = useSelector((state) => state.siteInfo);
 
-  // 添加上下文支持
-  const { currentContext, isTeamContext } = useCustomContext();
-  const siteInfo = useSelector((state) => state.siteInfo);
-
-  const handleTabChange = (newValue) => {
-    setCurrentTab(newValue);
-  };
-
-  const userDashboard = async () => {
-    try {
-      // 并行获取 Dashboard 数据和额度信息
-      const [dashboardRes, quotaRes] = await Promise.all([
-        API.get('/api/user/dashboard'),
-        API.get('/api/user/context_quota')
-      ]);
-
-      // 处理 Dashboard 数据
-      const { success: dashboardSuccess, message: dashboardMessage, data: dashboardData } = dashboardRes.data;
-      if (dashboardSuccess) {
-        if (dashboardData) {
-          // 有数据时正常处理
-          setDashboardData(dashboardData);
-          let lineData = getLineDataGroup(dashboardData);
-          setRequestChart(getLineCardOption(lineData, 'RequestCount'));
-          setQuotaChart(getLineCardOption(lineData, 'Quota'));
-          setTokenChart(getLineCardOption(lineData, 'PromptTokens'));
-          setStatisticalData(getBarDataGroup(dashboardData));
-          setModelUsageData(getModelUsageData(dashboardData));
-        } else {
-          // 无数据时清空所有图表数据
-          setDashboardData(null);
-          setRequestChart(null);
-          setQuotaChart(null);
-          setTokenChart(null);
-          setStatisticalData(null);
-          setModelUsageData([]);
+    // 获取 Dashboard 汇总数据
+    const fetchSummaryData = useCallback(async () => {
+        try {
+            const res = await API.get('/api/user/dashboard/summary');
+            const { success, message, data } = res.data;
+            if (success && data) {
+                setSummaryData(data);
+            } else {
+                showError(message);
+            }
+        } catch (error) {
+            console.error('Error fetching summary data:', error);
         }
-      } else {
-        showError(dashboardMessage);
-      }
+    }, []);
 
-      // 处理额度数据
-      const { success: quotaSuccess, message: quotaMessage, data: quotaData } = quotaRes.data;
-      if (quotaSuccess && quotaData) {
-        setQuotaData(quotaData);
-      } else if (!quotaSuccess) {
-        showError(quotaMessage);
-      }
+    // 获取详细 Dashboard 数据
+    const fetchDashboardData = useCallback(async () => {
+        try {
+            const res = await API.get('/api/user/dashboard');
+            const { success, message, data } = res.data;
+            if (success && data) {
+                setDashboardData(data);
+            } else {
+                showError(message);
+            }
+        } catch (error) {
+            console.error('Error fetching dashboard data:', error);
+        }
+    }, []);
 
-      setLoading(false);
-    } catch (error) {
-      console.error('Dashboard data fetch error:', error);
-      setLoading(false);
-    }
-  };
+    // 获取额度数据
+    const fetchQuotaData = useCallback(async () => {
+        try {
+            const res = await API.get('/api/user/context_quota');
+            const { success, message, data } = res.data;
+            if (success && data) {
+                setQuotaData(data);
+            } else {
+                showError(message);
+            }
+        } catch (error) {
+            console.error('Error fetching quota data:', error);
+        }
+    }, []);
 
-  useEffect(() => {
-    userDashboard();
-  }, []);
+    // 获取速率数据
+    const fetchRateData = useCallback(async () => {
+        try {
+            const res = await API.get('/api/user/dashboard/rate');
+            const { success, message, data } = res.data;
+            if (success && data) {
+                setRateData(data);
+            } else {
+                showError(message);
+            }
+        } catch (error) {
+            console.error('Error fetching rate data:', error);
+        }
+    }, []);
 
-  // 监听上下文切换事件，刷新额度数据
-  useEffect(() => {
-    const handleContextChange = () => {
-      userDashboard(); // 重新获取当前上下文的额度和统计数据
+    // 获取所有数据
+    const fetchAllData = useCallback(async () => {
+        setLoading(true);
+        try {
+            await Promise.all([fetchSummaryData(), fetchDashboardData(), fetchQuotaData(), fetchRateData()]);
+        } catch (error) {
+            console.error('Error fetching all data:', error);
+        } finally {
+            setLoading(false);
+        }
+    }, [fetchSummaryData, fetchDashboardData, fetchQuotaData, fetchRateData]);
+
+    // 初始加载
+    useEffect(() => {
+        fetchAllData();
+    }, [fetchAllData]);
+
+    // 监听上下文切换事件，刷新数据
+    useEffect(() => {
+        const handleContextChange = () => {
+            fetchAllData();
+        };
+
+        window.addEventListener('contextChanged', handleContextChange);
+        return () => {
+            window.removeEventListener('contextChanged', handleContextChange);
+        };
+    }, [fetchAllData]);
+    // 处理模型使用数据
+    const getModelUsageData = (data) => {
+        if (!data || !Array.isArray(data)) {
+            return [];
+        }
+
+        const modelUsage = {};
+        data.forEach((item) => {
+            if (!modelUsage[item.ModelName]) {
+                modelUsage[item.ModelName] = 0;
+            }
+            modelUsage[item.ModelName] += item.RequestCount;
+        });
+
+        return Object.entries(modelUsage).map(([name, count]) => ({
+            name,
+            value: count
+        }));
     };
 
-    window.addEventListener('contextChanged', handleContextChange);
-    return () => {
-      window.removeEventListener('contextChanged', handleContextChange);
+    // 计算趋势数据（简化版，实际应该从历史数据计算）
+    const calculateTrend = (current, previous) => {
+        if (!previous || previous === 0) return 0;
+        return Math.round(((current - previous) / previous) * 100);
     };
-  }, []);
 
-  // Dashboard content
-  const dashboardContent = (
-    <Grid container spacing={gridSpacing}>
-      {/* 支持的模型   */}
-      <Grid item xs={12}>
-        <SupportModels />
-      </Grid>
-      {/* 今日请求、消费、token */}
-      <Grid item xs={12}>
-        <Grid container spacing={gridSpacing}>
-          <Grid item lg={3} xs={12} sx={{ height: '160' }}>
-            <StatisticalLineChartCard
-              isLoading={isLoading}
-              title={t('dashboard_index.today_requests')}
-              type="request"
-              chartData={requestChart?.chartData}
-              todayValue={requestChart?.todayValue}
-              lastDayValue={requestChart?.lastDayValue}
-            />
-          </Grid>
-          <Grid item lg={3} xs={12} sx={{ height: '160' }}>
-            <StatisticalLineChartCard
-              isLoading={isLoading}
-              title={t('dashboard_index.today_consumption')}
-              type="quota"
-              chartData={quotaChart?.chartData}
-              todayValue={quotaChart?.todayValue}
-              lastDayValue={quotaChart?.lastDayValue}
-            />
-          </Grid>
-          <Grid item lg={3} xs={12} sx={{ height: '160' }}>
-            <StatisticalLineChartCard
-              isLoading={isLoading}
-              title={t('dashboard_index.today_tokens')}
-              type="token"
-              chartData={tokenChart?.chartData}
-              todayValue={tokenChart?.todayValue}
-              lastDayValue={tokenChart?.lastDayValue}
-            />
-          </Grid>
-          <Grid item lg={3} xs={12} sx={{ height: '160' }}>
-            <RPM />
-          </Grid>
-        </Grid>
-      </Grid>
+    // 生成图表数据
+    const getChartData = (data, field) => {
+        if (!data || !Array.isArray(data)) {
+            return [];
+        }
 
-      <Grid item xs={12}>
-        <Grid container spacing={gridSpacing}>
-          <Grid item lg={8} xs={12}>
-            {/* 7日模型消费统计 */}
-            <ApexCharts isLoading={isLoading} chartDatas={statisticalData} title={t('dashboard_index.week_model_statistics')} />
-            <Box mt={2}>
-              {/* 7日消费统计 */}
-              <QuotaLogWeek data={dashboardData} />
-            </Box>
-          </Grid>
+        const lastSevenDays = [];
+        for (let i = 6; i >= 0; i--) {
+            const date = new Date();
+            date.setDate(date.getDate() - i);
+            lastSevenDays.push(date.toISOString().split('T')[0]);
+        }
 
-          <Grid item lg={4} xs={12}>
-            {/* 用户信息 */}
-            <ModelUsagePieChart isLoading={isLoading} data={modelUsageData} />
-            <Box mt={2}>
-              <QuickStartCard />
-            </Box>
-            {/* 邀请 */}
-            <Box mt={2}>
-              <InviteCard />
-            </Box>
-          </Grid>
-        </Grid>
-      </Grid>
-    </Grid>
-  );
+        return lastSevenDays.map((date) => {
+            const dayData = data.find((item) => item.Date === date);
+            let value = 0;
 
-  return (
-    <>
-      <Stack direction="row" alignItems="center" justifyContent="space-between" mb={1}>
-        <Stack direction="row" alignItems="center" spacing={3}>
-          <Stack direction="column" spacing={1}>
-            <Stack direction="row" alignItems="center" spacing={2}>
-              <Typography variant="h2">{t('dashboard_index.title')}</Typography>
-              {currentContext && (
-                <Chip
-                  icon={<Icon icon={isTeamContext ? "solar:users-group-rounded-bold-duotone" : "solar:user-bold-duotone"} />}
-                  label={currentContext.name}
-                  color={isTeamContext ? "primary" : "default"}
-                  variant="outlined"
-                  size="small"
-                />
-              )}
-            </Stack>
-            <Typography variant="subtitle1" color="text.secondary">
-              {isTeamContext ? '团队仪表板' : '个人仪表板'}
-            </Typography>
-            {quotaData && (
-              <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                可用额度: {quotaData.unlimited ? '∞' : quotaData.available.toLocaleString()}
-                {quotaData.unlimited ? '' : ` / ${quotaData.quota.toLocaleString()}`}
-              </Typography>
-            )}
-          </Stack>
+            if (dayData) {
+                switch (field) {
+                    case 'requests':
+                        value = dayData.RequestCount;
+                        break;
+                    case 'quota':
+                        value = calculateQuota(dayData.Quota, 3);
+                        break;
+                    case 'tokens':
+                        value = dayData.PromptTokens + dayData.CompletionTokens;
+                        break;
+                }
+            }
 
-          {siteInfo.UptimeEnabled && (
-            <Stack direction="row" spacing={1}>
-              <Button
-                onClick={() => handleTabChange(0)}
-                variant={currentTab === 0 ? "contained" : "text"}
-                size="small"
-                disableElevation
-                sx={{
-                  padding: '6px 16px',
-                  borderRadius: '4px',
-                  backgroundColor: currentTab === 0 ? 'primary.main' : 'transparent',
-                  color: currentTab === 0 ? 'white' : 'text.primary',
-                  '&:hover': {
-                    backgroundColor: currentTab === 0 ? 'primary.dark' : 'action.hover'
-                  }
-                }}
-              >
-                {t('dashboard_index.tab_dashboard')}
-              </Button>
-              <Button
-                onClick={() => handleTabChange(1)}
-                variant={currentTab === 1 ? "contained" : "text"}
-                size="small"
-                disableElevation
-                sx={{
-                  padding: '6px 16px',
-                  borderRadius: '4px',
-                  backgroundColor: currentTab === 1 ? 'primary.main' : 'transparent',
-                  color: currentTab === 1 ? 'white' : 'text.primary',
-                  '&:hover': {
-                    backgroundColor: currentTab === 1 ? 'primary.dark' : 'action.hover'
-                  }
-                }}
-              >
-                {t('dashboard_index.tab_status')}
-              </Button>
-            </Stack>
-          )}
-        </Stack>
-      </Stack>
+            return { date: date, [field]: value };
+        });
+    };
 
-      {siteInfo.UptimeEnabled ? (
-        <>
-          <TabPanel value={currentTab} index={0}>
-            {dashboardContent}
-          </TabPanel>
-          <TabPanel value={currentTab} index={1}>
-            <StatusPanel />
-          </TabPanel>
-        </>
-      ) : (
-        dashboardContent
-      )}
-    </>
-  );
+    return (
+        <div className="@container/main flex flex-1 flex-col gap-2">
+            <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
+                {/* Section 1: 核心指标卡片 - 4列响应式网格 */}
+                <div className="*:data-[slot=card]:from-primary/5 *:data-[slot=card]:to-card dark:*:data-[slot=card]:bg-card grid grid-cols-1 gap-4 px-4 *:data-[slot=card]:bg-linear-to-t *:data-[slot=card]:shadow-xs lg:px-6 @xl/main:grid-cols-2 @5xl/main:grid-cols-4">
+                    <MetricCard
+                        type="request"
+                        title={t('dashboard_index.today_requests')}
+                        value={summaryData?.today?.requests || 0}
+                        trend={calculateTrend(summaryData?.today?.requests, summaryData?.week?.requests / 7)}
+                        chartData={getChartData(dashboardData, 'requests')}
+                        isLoading={isLoading}
+                    />
+                    <MetricCard
+                        type="quota"
+                        title={t('dashboard_index.today_consumption')}
+                        value={summaryData?.today?.quota || 0}
+                        trend={calculateTrend(summaryData?.today?.quota, summaryData?.week?.quota / 7)}
+                        chartData={getChartData(dashboardData, 'quota')}
+                        isLoading={isLoading}
+                    />
+                    <MetricCard
+                        type="token"
+                        title={t('dashboard_index.today_tokens')}
+                        value={summaryData?.today?.tokens || 0}
+                        trend={calculateTrend(summaryData?.today?.tokens, summaryData?.week?.tokens / 7)}
+                        chartData={getChartData(dashboardData, 'tokens')}
+                        isLoading={isLoading}
+                    />
+                    <MetricCard
+                        type="rpm"
+                        title={t('dashboard_index.RPM')}
+                        value={rateData?.rpm || 0}
+                        trend={0} // RPM 趋势需要从历史数据计算
+                        maxValue={rateData?.maxRPM || 100} // 使用 maxRPM 作为进度条最大值
+                        isLoading={isLoading}
+                    />
+                </div>
+
+                {/* Section 2: 趋势图表 - 全宽 */}
+                <div className="px-4 lg:px-6">
+                    <WeeklyTrendChart data={summaryData?.daily_trend || []} isLoading={isLoading} />
+                </div>
+
+                {/* Section 3: API 日志表格 - 全宽 */}
+                <div className="px-4 lg:px-6">
+                    <RecentLogsTable />
+                </div>
+
+                {/* Section 4: 其他辅助组件 - 2列网格 */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 px-4 lg:px-6">
+                    <QuotaAlertCard quotaData={quotaData} isLoading={isLoading} />
+                    <QuickActionsCard />
+                </div>
+
+                {/* Section 5: 模型分析组件 - 2列网格 */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 px-4 lg:px-6">
+                    <ModelUsagePieChart data={getModelUsageData(dashboardData)} isLoading={isLoading} />
+                    <TopModelsChart data={summaryData?.top_models || []} isLoading={isLoading} />
+                </div>
+
+                {/* Section 6: 模型支持列表 - 全宽 */}
+                <div className="px-4 lg:px-6">
+                    <SupportModels />
+                </div>
+
+                {/* Section 7: 底部信息卡片 - 2列网格 */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 px-4 lg:px-6">
+                    <QuickStartCard />
+                    <InviteCard />
+                </div>
+
+                {/* Section 8: 状态监控面板 - 条件渲染 */}
+                {siteInfo.UptimeEnabled && (
+                    <div className="px-4 lg:px-6">
+                        <StatusPanel />
+                    </div>
+                )}
+            </div>
+        </div>
+    );
 };
 
-// 新增函数来处理模型使用数据
-function getModelUsageData(data) {
-  const modelUsage = {};
-  data.forEach((item) => {
-    if (!modelUsage[item.ModelName]) {
-      modelUsage[item.ModelName] = 0;
-    }
-    modelUsage[item.ModelName] += item.RequestCount;
-  });
-
-  return Object.entries(modelUsage).map(([name, count]) => ({
-    name,
-    value: count
-  }));
-}
 export default Dashboard;
-
-function getLineDataGroup(statisticalData) {
-  let groupedData = statisticalData.reduce((acc, cur) => {
-    if (!acc[cur.Date]) {
-      acc[cur.Date] = {
-        date: cur.Date,
-        RequestCount: 0,
-        Quota: 0,
-        PromptTokens: 0,
-        CompletionTokens: 0
-      };
-    }
-    acc[cur.Date].RequestCount += cur.RequestCount;
-    acc[cur.Date].Quota += cur.Quota;
-    acc[cur.Date].PromptTokens += cur.PromptTokens;
-    acc[cur.Date].CompletionTokens += cur.CompletionTokens;
-    return acc;
-  }, {});
-  let lastSevenDays = getLastSevenDays();
-  return lastSevenDays.map((Date) => {
-    if (!groupedData[Date]) {
-      return {
-        date: Date,
-        RequestCount: 0,
-        Quota: 0,
-        PromptTokens: 0,
-        CompletionTokens: 0
-      };
-    } else {
-      return groupedData[Date];
-    }
-  });
-}
-
-function getBarDataGroup(data) {
-  const lastSevenDays = getLastSevenDays();
-  const result = [];
-  const map = new Map();
-  let totalCosts = 0;
-
-  for (const item of data) {
-    if (!map.has(item.ModelName)) {
-      const newData = { name: item.ModelName, data: new Array(7).fill(0) };
-      map.set(item.ModelName, newData);
-      result.push(newData);
-    }
-    const index = lastSevenDays.indexOf(item.Date);
-    if (index !== -1) {
-      let costs = Number(calculateQuota(item.Quota, 3));
-      map.get(item.ModelName).data[index] = costs;
-      totalCosts += parseFloat(costs.toFixed(3));
-    }
-  }
-
-  let chartData = generateBarChartOptions(lastSevenDays, result, 'USD', 3);
-  chartData.options.title.text = 'Total：$' + renderChartNumber(totalCosts, 3);
-
-  return chartData;
-}
-
-function getLineCardOption(lineDataGroup, field) {
-  let todayValue = 0;
-  let lastDayValue = 0;
-  let chartData = null;
-
-  let lineData = lineDataGroup.map((item) => {
-    let tmp = {
-      x: item.date,
-      y: item[field]
-    };
-    switch (field) {
-      case 'Quota':
-        tmp.y = calculateQuota(item.Quota, 3);
-        break;
-      case 'PromptTokens':
-        tmp.y += item.CompletionTokens;
-        break;
-    }
-
-    return tmp;
-  });
-
-  // 获取今天和昨天的数据
-  if (lineData.length > 1) {
-    todayValue = lineData[lineData.length - 1].y;
-    if (lineData.length > 2) {
-      lastDayValue = lineData[lineData.length - 2].y;
-    }
-  }
-
-  switch (field) {
-    case 'RequestCount':
-      // chartData = generateLineChartOptions(lineData, '次');
-      lastDayValue = parseFloat(lastDayValue);
-      todayValue = parseFloat(todayValue);
-      break;
-    case 'Quota':
-      // chartData = generateLineChartOptions(lineData, '美元');
-      lastDayValue = parseFloat(lastDayValue);
-      todayValue = '$' + parseFloat(todayValue);
-      break;
-    case 'PromptTokens':
-      // chartData = generateLineChartOptions(lineData, '');
-      lastDayValue = parseFloat(lastDayValue);
-      todayValue = parseFloat(todayValue);
-      break;
-  }
-
-  chartData = {
-    series: [
-      {
-        data: lineData
-      }
-    ]
-  };
-
-  return { chartData: chartData, todayValue: todayValue, lastDayValue: lastDayValue };
-}

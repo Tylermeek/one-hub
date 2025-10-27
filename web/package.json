@@ -92,11 +92,6 @@
       "react-app"
     ]
   },
-  "babel": {
-    "presets": [
-      "@babel/preset-react"
-    ]
-  },
   "browserslist": {
     "production": [
       "defaults",
@@ -109,9 +104,6 @@
     ]
   },
   "devDependencies": {
-    "@babel/core": "^7.23.9",
-    "@babel/eslint-parser": "^7.23.10",
-    "@babel/plugin-proposal-private-property-in-object": "^7.21.11",
     "@types/node": "^24.9.1",
     "eslint": "^8.56.0",
     "eslint-config-prettier": "^9.1.0",

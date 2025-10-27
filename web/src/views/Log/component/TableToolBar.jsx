@@ -11,203 +11,203 @@ import 'dayjs/locale/zh-cn';
 // ----------------------------------------------------------------------
 
 export default function TableToolBar({ filterName, handleFilterName, userIsAdmin, contexts, selectedContextId, onContextChange }) {
-    const { t } = useTranslation();
-    const theme = useTheme();
-    const grey500 = theme.palette.grey[500];
+  const { t } = useTranslation();
+  const theme = useTheme();
+  const grey500 = theme.palette.grey[500];
 
-    return (
-        <>
-            <Stack
-                direction={{ xs: 'column', sm: 'row' }}
-                spacing={{ xs: 3, sm: 2, md: 2 }}
-                padding={'24px'}
-                paddingBottom={'0px'}
-                sx={{ width: '100%', '& > *': { flex: 1 } }}
+  return (
+    <>
+      <Stack
+        direction={{ xs: 'column', sm: 'row' }}
+        spacing={{ xs: 3, sm: 2, md: 2 }}
+        padding={'24px'}
+        paddingBottom={'0px'}
+        sx={{ width: '100%', '& > *': { flex: 1 } }}
+      >
+        {/* 空间筛选器 - 仅对普通用户显示 */}
+        {!userIsAdmin && contexts && contexts.length > 0 && (
+          <FormControl>
+            <InputLabel htmlFor="context-filter-label">空间筛选</InputLabel>
+            <Select
+              id="context-filter"
+              value={selectedContextId}
+              onChange={onContextChange}
+              label="空间筛选"
+              startAdornment={
+                <InputAdornment position="start">
+                  <Icon icon="solar:users-group-rounded-bold-duotone" width="20" color={grey500} />
+                </InputAdornment>
+              }
             >
-                {/* 空间筛选器 - 仅对普通用户显示 */}
-                {!userIsAdmin && contexts && contexts.length > 0 && (
-                    <FormControl>
-                        <InputLabel htmlFor="context-filter-label">空间筛选</InputLabel>
-                        <Select
-                            id="context-filter"
-                            value={selectedContextId}
-                            onChange={onContextChange}
-                            label="空间筛选"
-                            startAdornment={
-                                <InputAdornment position="start">
-                                    <Icon icon="solar:users-group-rounded-bold-duotone" width="20" color={grey500} />
-                                </InputAdornment>
-                            }
-                        >
-                            <MenuItem value={-1}>全部空间</MenuItem>
-                            {contexts.map((context) => (
-                                <MenuItem key={`${context.type}-${context.id}`} value={context.type === 'user' ? 0 : context.id}>
-                                    {context.name}
-                                </MenuItem>
-                            ))}
-                        </Select>
-                    </FormControl>
-                )}
-                <FormControl>
-                    <InputLabel htmlFor="channel-token_name-label">{t('tableToolBar.tokenName')}</InputLabel>
-                    <OutlinedInput
-                        id="token_name"
-                        name="token_name"
-                        sx={{
-                            minWidth: '100%'
-                        }}
-                        label={t('tableToolBar.tokenName')}
-                        value={filterName.token_name}
-                        onChange={handleFilterName}
-                        placeholder={t('tableToolBar.tokenName')}
-                        startAdornment={
-                            <InputAdornment position="start">
-                                <Icon icon="solar:key-bold-duotone" width="20" color={grey500} />
-                            </InputAdornment>
-                        }
-                    />
-                </FormControl>
-                <FormControl>
-                    <InputLabel htmlFor="channel-model_name-label">{t('tableToolBar.modelName')}</InputLabel>
-                    <OutlinedInput
-                        id="model_name"
-                        name="model_name"
-                        sx={{
-                            minWidth: '100%'
-                        }}
-                        label={t('tableToolBar.modelName')}
-                        value={filterName.model_name}
-                        onChange={handleFilterName}
-                        placeholder={t('tableToolBar.modelName')}
-                        startAdornment={
-                            <InputAdornment position="start">
-                                <Icon icon="solar:box-minimalistic-bold-duotone" width="20" color={grey500} />
-                            </InputAdornment>
-                        }
-                    />
-                </FormControl>
-                <FormControl>
-                    <InputLabel htmlFor="channel-source_ip-label">{t('tableToolBar.sourceIp')}</InputLabel>
-                    <OutlinedInput
-                        id="source_ip"
-                        name="source_ip"
-                        sx={{
-                            minWidth: '100%'
-                        }}
-                        label={t('tableToolBar.sourceIp')}
-                        value={filterName.source_ip}
-                        onChange={handleFilterName}
-                        placeholder={t('tableToolBar.sourceIp')}
-                        startAdornment={
-                            <InputAdornment position="start">
-                                <Icon icon="solar:user-bold-duotone" width="20" color={grey500} />
-                            </InputAdornment>
-                        }
-                    />
-                </FormControl>
-                <FormControl>
-                    <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale={'zh-cn'}>
-                        <DateTimePicker
-                            label={t('tableToolBar.startTime')}
-                            ampm={false}
-                            name="start_timestamp"
-                            value={filterName.start_timestamp === 0 ? null : dayjs.unix(filterName.start_timestamp)}
-                            onChange={(value) => {
-                                if (value === null) {
-                                    handleFilterName({ target: { name: 'start_timestamp', value: 0 } });
-                                    return;
-                                }
-                                handleFilterName({ target: { name: 'start_timestamp', value: value.unix() } });
-                            }}
-                            slotProps={{
-                                actionBar: {
-                                    actions: ['clear', 'today', 'accept']
-                                }
-                            }}
-                        />
-                    </LocalizationProvider>
-                </FormControl>
-                <FormControl>
-                    <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale={'zh-cn'}>
-                        <DateTimePicker
-                            label={t('tableToolBar.endTime')}
-                            name="end_timestamp"
-                            ampm={false}
-                            value={filterName.end_timestamp === 0 ? null : dayjs.unix(filterName.end_timestamp)}
-                            onChange={(value) => {
-                                if (value === null) {
-                                    handleFilterName({ target: { name: 'end_timestamp', value: 0 } });
-                                    return;
-                                }
-                                handleFilterName({ target: { name: 'end_timestamp', value: value.unix() } });
-                            }}
-                            slotProps={{
-                                actionBar: {
-                                    actions: ['clear', 'today', 'accept']
-                                }
-                            }}
-                        />
-                    </LocalizationProvider>
-                </FormControl>
-            </Stack>
+              <MenuItem value={-1}>全部空间</MenuItem>
+              {contexts.map((context) => (
+                <MenuItem key={`${context.type}-${context.id}`} value={context.type === 'user' ? 0 : context.id}>
+                  {context.name}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        )}
+        <FormControl>
+          <InputLabel htmlFor="channel-token_name-label">{t('tableToolBar.tokenName')}</InputLabel>
+          <OutlinedInput
+            id="token_name"
+            name="token_name"
+            sx={{
+              minWidth: '100%'
+            }}
+            label={t('tableToolBar.tokenName')}
+            value={filterName.token_name}
+            onChange={handleFilterName}
+            placeholder={t('tableToolBar.tokenName')}
+            startAdornment={
+              <InputAdornment position="start">
+                <Icon icon="solar:key-bold-duotone" width="20" color={grey500} />
+              </InputAdornment>
+            }
+          />
+        </FormControl>
+        <FormControl>
+          <InputLabel htmlFor="channel-model_name-label">{t('tableToolBar.modelName')}</InputLabel>
+          <OutlinedInput
+            id="model_name"
+            name="model_name"
+            sx={{
+              minWidth: '100%'
+            }}
+            label={t('tableToolBar.modelName')}
+            value={filterName.model_name}
+            onChange={handleFilterName}
+            placeholder={t('tableToolBar.modelName')}
+            startAdornment={
+              <InputAdornment position="start">
+                <Icon icon="solar:box-minimalistic-bold-duotone" width="20" color={grey500} />
+              </InputAdornment>
+            }
+          />
+        </FormControl>
+        <FormControl>
+          <InputLabel htmlFor="channel-source_ip-label">{t('tableToolBar.sourceIp')}</InputLabel>
+          <OutlinedInput
+            id="source_ip"
+            name="source_ip"
+            sx={{
+              minWidth: '100%'
+            }}
+            label={t('tableToolBar.sourceIp')}
+            value={filterName.source_ip}
+            onChange={handleFilterName}
+            placeholder={t('tableToolBar.sourceIp')}
+            startAdornment={
+              <InputAdornment position="start">
+                <Icon icon="solar:user-bold-duotone" width="20" color={grey500} />
+              </InputAdornment>
+            }
+          />
+        </FormControl>
+        <FormControl>
+          <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale={'zh-cn'}>
+            <DateTimePicker
+              label={t('tableToolBar.startTime')}
+              ampm={false}
+              name="start_timestamp"
+              value={filterName.start_timestamp === 0 ? null : dayjs.unix(filterName.start_timestamp)}
+              onChange={(value) => {
+                if (value === null) {
+                  handleFilterName({ target: { name: 'start_timestamp', value: 0 } });
+                  return;
+                }
+                handleFilterName({ target: { name: 'start_timestamp', value: value.unix() } });
+              }}
+              slotProps={{
+                actionBar: {
+                  actions: ['clear', 'today', 'accept']
+                }
+              }}
+            />
+          </LocalizationProvider>
+        </FormControl>
+        <FormControl>
+          <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale={'zh-cn'}>
+            <DateTimePicker
+              label={t('tableToolBar.endTime')}
+              name="end_timestamp"
+              ampm={false}
+              value={filterName.end_timestamp === 0 ? null : dayjs.unix(filterName.end_timestamp)}
+              onChange={(value) => {
+                if (value === null) {
+                  handleFilterName({ target: { name: 'end_timestamp', value: 0 } });
+                  return;
+                }
+                handleFilterName({ target: { name: 'end_timestamp', value: value.unix() } });
+              }}
+              slotProps={{
+                actionBar: {
+                  actions: ['clear', 'today', 'accept']
+                }
+              }}
+            />
+          </LocalizationProvider>
+        </FormControl>
+      </Stack>
 
-            {userIsAdmin && (
-                <Stack
-                    direction={{ xs: 'column', sm: 'row' }}
-                    spacing={{ xs: 3, sm: 2, md: 4 }}
-                    padding={'24px'}
-                    sx={{ width: '100%', '& > *': { flex: 1 } }}
-                >
-                    <FormControl>
-                        <InputLabel htmlFor="channel-channel_id-label">{t('tableToolBar.channelId')}</InputLabel>
-                        <OutlinedInput
-                            id="channel_id"
-                            name="channel_id"
-                            sx={{
-                                minWidth: '100%'
-                            }}
-                            label={t('tableToolBar.channelId')}
-                            value={filterName.channel_id}
-                            onChange={handleFilterName}
-                            placeholder={t('tableToolBar.channelId')}
-                            startAdornment={
-                                <InputAdornment position="start">
-                                    <Icon icon="ph:open-ai-logo-duotone" width="20" color={grey500} />
-                                </InputAdornment>
-                            }
-                        />
-                    </FormControl>
+      {userIsAdmin && (
+        <Stack
+          direction={{ xs: 'column', sm: 'row' }}
+          spacing={{ xs: 3, sm: 2, md: 4 }}
+          padding={'24px'}
+          sx={{ width: '100%', '& > *': { flex: 1 } }}
+        >
+          <FormControl>
+            <InputLabel htmlFor="channel-channel_id-label">{t('tableToolBar.channelId')}</InputLabel>
+            <OutlinedInput
+              id="channel_id"
+              name="channel_id"
+              sx={{
+                minWidth: '100%'
+              }}
+              label={t('tableToolBar.channelId')}
+              value={filterName.channel_id}
+              onChange={handleFilterName}
+              placeholder={t('tableToolBar.channelId')}
+              startAdornment={
+                <InputAdornment position="start">
+                  <Icon icon="ph:open-ai-logo-duotone" width="20" color={grey500} />
+                </InputAdornment>
+              }
+            />
+          </FormControl>
 
-                    <FormControl>
-                        <InputLabel htmlFor="channel-username-label">{t('tableToolBar.username')}</InputLabel>
-                        <OutlinedInput
-                            id="username"
-                            name="username"
-                            sx={{
-                                minWidth: '100%'
-                            }}
-                            label={t('tableToolBar.username')}
-                            value={filterName.username}
-                            onChange={handleFilterName}
-                            placeholder={t('tableToolBar.username')}
-                            startAdornment={
-                                <InputAdornment position="start">
-                                    <Icon icon="solar:user-bold-duotone" width="20" color={grey500} />
-                                </InputAdornment>
-                            }
-                        />
-                    </FormControl>
-                </Stack>
-            )}
-        </>
-    );
+          <FormControl>
+            <InputLabel htmlFor="channel-username-label">{t('tableToolBar.username')}</InputLabel>
+            <OutlinedInput
+              id="username"
+              name="username"
+              sx={{
+                minWidth: '100%'
+              }}
+              label={t('tableToolBar.username')}
+              value={filterName.username}
+              onChange={handleFilterName}
+              placeholder={t('tableToolBar.username')}
+              startAdornment={
+                <InputAdornment position="start">
+                  <Icon icon="solar:user-bold-duotone" width="20" color={grey500} />
+                </InputAdornment>
+              }
+            />
+          </FormControl>
+        </Stack>
+      )}
+    </>
+  );
 }
 
 TableToolBar.propTypes = {
-    filterName: PropTypes.object,
-    handleFilterName: PropTypes.func,
-    userIsAdmin: PropTypes.bool,
-    contexts: PropTypes.array,
-    selectedContextId: PropTypes.number,
-    onContextChange: PropTypes.func
+  filterName: PropTypes.object,
+  handleFilterName: PropTypes.func,
+  userIsAdmin: PropTypes.bool,
+  contexts: PropTypes.array,
+  selectedContextId: PropTypes.number,
+  onContextChange: PropTypes.func
 };

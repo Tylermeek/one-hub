@@ -10,19 +10,19 @@ import { QuotaCard } from '@/components/quota-card';
 import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarRail } from '@/components/ui/sidebar';
 
 export function AppSidebar({ ...props }) {
-    return (
-        <Sidebar collapsible="icon" {...props}>
-            <SidebarHeader>
-                <TeamSwitcher />
-            </SidebarHeader>
-            <SidebarContent>
-                <NavMain />
-            </SidebarContent>
-            <SidebarFooter>
-                <QuotaCard />
-                <NavUser />
-            </SidebarFooter>
-            <SidebarRail />
-        </Sidebar>
-    );
+  return (
+    <Sidebar collapsible="icon" {...props}>
+      <SidebarHeader>
+        <TeamSwitcher />
+      </SidebarHeader>
+      <SidebarContent>
+        <NavMain />
+      </SidebarContent>
+      <SidebarFooter>
+        <QuotaCard />
+        <NavUser />
+      </SidebarFooter>
+      <SidebarRail />
+    </Sidebar>
+  );
 }

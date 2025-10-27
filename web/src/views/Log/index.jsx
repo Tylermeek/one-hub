@@ -28,488 +28,476 @@ import { useLogType } from './type/LogType';
 import useCustomContext from 'hooks/useContext';
 
 export default function Log() {
-    const { t } = useTranslation();
-    const LogType = useLogType();
-    const originalKeyword = {
-        p: 0,
-        username: '',
-        token_name: '',
-        model_name: '',
-        start_timestamp: 0,
-        end_timestamp: dayjs().unix() + 3600,
-        log_type: '0',
-        channel_id: '',
-        source_ip: ''
-    };
+  const { t } = useTranslation();
+  const LogType = useLogType();
+  const originalKeyword = {
+    p: 0,
+    username: '',
+    token_name: '',
+    model_name: '',
+    start_timestamp: 0,
+    end_timestamp: dayjs().unix() + 3600,
+    log_type: '0',
+    channel_id: '',
+    source_ip: ''
+  };
 
-    const [page, setPage] = useState(0);
-    const [order, setOrder] = useState('desc');
-    const [orderBy, setOrderBy] = useState('created_at');
-    const [rowsPerPage, setRowsPerPage] = useState(() => getPageSize('log'));
-    const [listCount, setListCount] = useState(0);
-    const [searching, setSearching] = useState(false);
-    const [toolBarValue, setToolBarValue] = useState(originalKeyword);
+  const [page, setPage] = useState(0);
+  const [order, setOrder] = useState('desc');
+  const [orderBy, setOrderBy] = useState('created_at');
+  const [rowsPerPage, setRowsPerPage] = useState(() => getPageSize('log'));
+  const [listCount, setListCount] = useState(0);
+  const [searching, setSearching] = useState(false);
+  const [toolBarValue, setToolBarValue] = useState(originalKeyword);
 
-    // 添加上下文支持
-    const { currentContext, isTeamContext } = useCustomContext();
-    const [searchKeyword, setSearchKeyword] = useState(originalKeyword);
-    const [refreshFlag, setRefreshFlag] = useState(false);
-    const { userGroup } = useSelector((state) => state.account);
-    const theme = useTheme();
-    const matchUpMd = useMediaQuery(theme.breakpoints.up('sm'));
+  // 添加上下文支持
+  const { currentContext, isTeamContext } = useCustomContext();
+  const [searchKeyword, setSearchKeyword] = useState(originalKeyword);
+  const [refreshFlag, setRefreshFlag] = useState(false);
+  const { userGroup } = useSelector((state) => state.account);
+  const theme = useTheme();
+  const matchUpMd = useMediaQuery(theme.breakpoints.up('sm'));
 
-    const [logs, setLogs] = useState([]);
-    const userIsAdmin = useIsAdmin();
+  const [logs, setLogs] = useState([]);
+  const userIsAdmin = useIsAdmin();
 
-    // 空间筛选相关状态
-    const [contexts, setContexts] = useState([]);
-    const [selectedContextId, setSelectedContextId] = useState(-1); // -1=全部, 0=个人, >0=团队
+  // 空间筛选相关状态
+  const [contexts, setContexts] = useState([]);
+  const [selectedContextId, setSelectedContextId] = useState(-1); // -1=全部, 0=个人, >0=团队
 
-    // 添加列显示设置相关状态
-    const [columnVisibility, setColumnVisibility] = useState({
-        created_at: true,
-        channel_id: true,
-        user_id: true,
-        group: true,
-        token_name: true,
-        type: true,
-        model_name: true,
-        duration: true,
-        message: true,
-        completion: true,
-        quota: true,
-        quota_source: true,
-        source_ip: true,
-        detail: true
+  // 添加列显示设置相关状态
+  const [columnVisibility, setColumnVisibility] = useState({
+    created_at: true,
+    channel_id: true,
+    user_id: true,
+    group: true,
+    token_name: true,
+    type: true,
+    model_name: true,
+    duration: true,
+    message: true,
+    completion: true,
+    quota: true,
+    quota_source: true,
+    source_ip: true,
+    detail: true
+  });
+  const [columnMenuAnchor, setColumnMenuAnchor] = useState(null);
+
+  // 处理列显示菜单打开和关闭
+  const handleColumnMenuOpen = (event) => {
+    setColumnMenuAnchor(event.currentTarget);
+  };
+
+  const handleColumnMenuClose = () => {
+    setColumnMenuAnchor(null);
+  };
+
+  // 处理列显示状态变更
+  const handleColumnVisibilityChange = (columnId) => {
+    setColumnVisibility({
+      ...columnVisibility,
+      [columnId]: !columnVisibility[columnId]
     });
-    const [columnMenuAnchor, setColumnMenuAnchor] = useState(null);
+  };
 
-    // 处理列显示菜单打开和关闭
-    const handleColumnMenuOpen = (event) => {
-        setColumnMenuAnchor(event.currentTarget);
-    };
+  // 处理全选/取消全选列显示
+  const handleSelectAllColumns = () => {
+    const allColumns = Object.keys(columnVisibility);
+    const areAllVisible = allColumns.every((column) => columnVisibility[column]);
 
-    const handleColumnMenuClose = () => {
-        setColumnMenuAnchor(null);
-    };
+    const newColumnVisibility = {};
+    allColumns.forEach((column) => {
+      newColumnVisibility[column] = !areAllVisible;
+    });
 
-    // 处理列显示状态变更
-    const handleColumnVisibilityChange = (columnId) => {
-        setColumnVisibility({
-            ...columnVisibility,
-            [columnId]: !columnVisibility[columnId]
-        });
-    };
+    setColumnVisibility(newColumnVisibility);
+  };
 
-    // 处理全选/取消全选列显示
-    const handleSelectAllColumns = () => {
-        const allColumns = Object.keys(columnVisibility);
-        const areAllVisible = allColumns.every((column) => columnVisibility[column]);
+  const handleSort = (event, id) => {
+    const isAsc = orderBy === id && order === 'asc';
+    if (id !== '') {
+      setOrder(isAsc ? 'desc' : 'asc');
+      setOrderBy(id);
+    }
+  };
 
-        const newColumnVisibility = {};
-        allColumns.forEach((column) => {
-            newColumnVisibility[column] = !areAllVisible;
-        });
+  const handleChangePage = (event, newPage) => {
+    setPage(newPage);
+  };
 
-        setColumnVisibility(newColumnVisibility);
-    };
+  const handleChangeRowsPerPage = (event) => {
+    const newRowsPerPage = parseInt(event.target.value, 10);
+    setPage(0);
+    setRowsPerPage(newRowsPerPage);
+    savePageSize('log', newRowsPerPage);
+  };
 
-    const handleSort = (event, id) => {
-        const isAsc = orderBy === id && order === 'asc';
-        if (id !== '') {
-            setOrder(isAsc ? 'desc' : 'asc');
-            setOrderBy(id);
+  const searchLogs = async () => {
+    setPage(0);
+    setSearchKeyword(toolBarValue);
+  };
+
+  const handleToolBarValue = (event) => {
+    setToolBarValue({ ...toolBarValue, [event.target.name]: event.target.value });
+  };
+
+  const handleTabsChange = async (event, newValue) => {
+    const updatedToolBarValue = { ...toolBarValue, log_type: newValue };
+    setToolBarValue(updatedToolBarValue);
+    setPage(0);
+    setSearchKeyword(updatedToolBarValue);
+  };
+
+  // 获取用户空间列表
+  const fetchContexts = async () => {
+    try {
+      const res = await API.get('/api/user/contexts');
+      const { success, data } = res.data;
+      if (success) {
+        setContexts(data);
+      }
+    } catch (error) {
+      console.error('Failed to fetch contexts:', error);
+    }
+  };
+
+  // 处理空间筛选变化
+  const handleContextFilterChange = (event) => {
+    const newContextId = parseInt(event.target.value);
+    setSelectedContextId(newContextId);
+    setPage(0);
+    // 触发数据重新获取
+    setRefreshFlag(!refreshFlag);
+  };
+
+  const fetchData = useCallback(
+    async (page, rowsPerPage, keyword, order, orderBy) => {
+      setSearching(true);
+      keyword = trims(keyword);
+      try {
+        if (orderBy) {
+          orderBy = order === 'desc' ? '-' + orderBy : orderBy;
         }
-    };
-
-    const handleChangePage = (event, newPage) => {
-        setPage(newPage);
-    };
-
-    const handleChangeRowsPerPage = (event) => {
-        const newRowsPerPage = parseInt(event.target.value, 10);
-        setPage(0);
-        setRowsPerPage(newRowsPerPage);
-        savePageSize('log', newRowsPerPage);
-    };
-
-    const searchLogs = async () => {
-        setPage(0);
-        setSearchKeyword(toolBarValue);
-    };
-
-    const handleToolBarValue = (event) => {
-        setToolBarValue({ ...toolBarValue, [event.target.name]: event.target.value });
-    };
-
-    const handleTabsChange = async (event, newValue) => {
-        const updatedToolBarValue = { ...toolBarValue, log_type: newValue };
-        setToolBarValue(updatedToolBarValue);
-        setPage(0);
-        setSearchKeyword(updatedToolBarValue);
-    };
-
-    // 获取用户空间列表
-    const fetchContexts = async () => {
-        try {
-            const res = await API.get('/api/user/contexts');
-            const { success, data } = res.data;
-            if (success) {
-                setContexts(data);
-            }
-        } catch (error) {
-            console.error('Failed to fetch contexts:', error);
-        }
-    };
-
-    // 处理空间筛选变化
-    const handleContextFilterChange = (event) => {
-        const newContextId = parseInt(event.target.value);
-        setSelectedContextId(newContextId);
-        setPage(0);
-        // 触发数据重新获取
-        setRefreshFlag(!refreshFlag);
-    };
-
-    const fetchData = useCallback(
-        async (page, rowsPerPage, keyword, order, orderBy) => {
-            setSearching(true);
-            keyword = trims(keyword);
-            try {
-                if (orderBy) {
-                    orderBy = order === 'desc' ? '-' + orderBy : orderBy;
-                }
-                const url = userIsAdmin ? '/api/log/' : '/api/log/self/';
-                if (!userIsAdmin) {
-                    delete keyword.username;
-                    delete keyword.channel_id;
-                }
-
-                const res = await API.get(url, {
-                    params: {
-                        page: page + 1,
-                        size: rowsPerPage,
-                        order: orderBy,
-                        team_id: selectedContextId,
-                        ...keyword
-                    }
-                });
-                const { success, message, data } = res.data;
-                if (success) {
-                    setListCount(data.total_count);
-                    setLogs(data.data);
-                } else {
-                    showError(message);
-                }
-            } catch (error) {
-                console.error(error);
-            }
-            setSearching(false);
-        },
-        [userIsAdmin, selectedContextId]
-    );
-
-    // 处理刷新
-    const handleRefresh = async () => {
-        setOrderBy('created_at');
-        setOrder('desc');
-        setToolBarValue(originalKeyword);
-        setSearchKeyword(originalKeyword);
-        setRefreshFlag(!refreshFlag);
-    };
-
-    useEffect(() => {
-        fetchData(page, rowsPerPage, searchKeyword, order, orderBy);
-    }, [page, rowsPerPage, searchKeyword, order, orderBy, fetchData, refreshFlag]);
-
-    // 初始化时获取空间列表
-    useEffect(() => {
+        const url = userIsAdmin ? '/api/log/' : '/api/log/self/';
         if (!userIsAdmin) {
-            fetchContexts();
+          delete keyword.username;
+          delete keyword.channel_id;
         }
-    }, [userIsAdmin]);
 
-    return (
-        <>
-            <Stack direction="row" alignItems="center" justifyContent="space-between" mb={5}>
-                <Stack direction="column" spacing={1}>
-                    <Stack direction="row" alignItems="center" spacing={2}>
-                        <Typography variant="h2">{t('logPage.title')}</Typography>
-                        {currentContext && (
-                            <Chip
-                                icon={<Icon icon={isTeamContext ? 'solar:users-group-rounded-bold-duotone' : 'solar:user-bold-duotone'} />}
-                                label={currentContext.name}
-                                color={isTeamContext ? 'primary' : 'default'}
-                                variant="outlined"
-                                size="small"
-                            />
-                        )}
-                    </Stack>
-                    <Typography variant="subtitle1" color="text.secondary">
-                        {isTeamContext ? '团队日志' : '个人日志'}
-                    </Typography>
-                </Stack>
-            </Stack>
-            <Card>
-                <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
-                    <Tabs
-                        value={toolBarValue.log_type}
-                        onChange={handleTabsChange}
-                        aria-label="basic tabs example"
-                        variant="scrollable"
-                        scrollButtons="auto"
-                        allowScrollButtonsMobile
-                        sx={{
-                            '& .MuiTabs-indicator': {
-                                display: 'none'
-                            }
-                        }}
-                    >
-                        {Object.values(LogType).map((option) => {
-                            return <Tab key={option.value} label={option.text} value={option.value} />;
-                        })}
-                    </Tabs>
-                </Box>
-                <Box component="form" noValidate>
-                    <TableToolBar
-                        filterName={toolBarValue}
-                        handleFilterName={handleToolBarValue}
-                        userIsAdmin={userIsAdmin}
-                        contexts={contexts}
-                        selectedContextId={selectedContextId}
-                        onContextChange={handleContextFilterChange}
-                    />
-                </Box>
-                <Toolbar
-                    sx={{
-                        textAlign: 'right',
-                        height: 50,
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        p: (theme) => theme.spacing(0, 1, 0, 3)
-                    }}
-                >
-                    <Container maxWidth="xl">
-                        {matchUpMd ? (
-                            <ButtonGroup variant="outlined" aria-label="outlined small primary button group">
-                                <Button
-                                    onClick={handleRefresh}
-                                    size="small"
-                                    startIcon={<Icon icon="solar:refresh-bold-duotone" width={18} />}
-                                >
-                                    {t('logPage.refreshButton')}
-                                </Button>
+        const res = await API.get(url, {
+          params: {
+            page: page + 1,
+            size: rowsPerPage,
+            order: orderBy,
+            team_id: selectedContextId,
+            ...keyword
+          }
+        });
+        const { success, message, data } = res.data;
+        if (success) {
+          setListCount(data.total_count);
+          setLogs(data.data);
+        } else {
+          showError(message);
+        }
+      } catch (error) {
+        console.error(error);
+      }
+      setSearching(false);
+    },
+    [userIsAdmin, selectedContextId]
+  );
 
-                                <Button
-                                    onClick={searchLogs}
-                                    size="small"
-                                    startIcon={<Icon icon="solar:minimalistic-magnifer-line-duotone" width={18} />}
-                                >
-                                    {t('logPage.searchButton')}
-                                </Button>
+  // 处理刷新
+  const handleRefresh = async () => {
+    setOrderBy('created_at');
+    setOrder('desc');
+    setToolBarValue(originalKeyword);
+    setSearchKeyword(originalKeyword);
+    setRefreshFlag(!refreshFlag);
+  };
 
-                                <Button
-                                    onClick={handleColumnMenuOpen}
-                                    size="small"
-                                    startIcon={<Icon icon="solar:settings-bold-duotone" width={18} />}
-                                >
-                                    {t('logPage.columnSettings')}
-                                </Button>
-                            </ButtonGroup>
-                        ) : (
-                            <Stack
-                                direction="row"
-                                spacing={1}
-                                divider={<Divider orientation="vertical" flexItem />}
-                                justifyContent="space-around"
-                                alignItems="center"
-                            >
-                                <IconButton onClick={handleRefresh} size="small">
-                                    <Icon icon="solar:refresh-bold-duotone" width={18} />
-                                </IconButton>
-                                <IconButton onClick={searchLogs} size="small">
-                                    <Icon icon="solar:minimalistic-magnifer-line-duotone" width={18} />
-                                </IconButton>
-                                <IconButton onClick={handleColumnMenuOpen} size="small">
-                                    <Icon icon="solar:settings-bold-duotone" width={18} />
-                                </IconButton>
-                            </Stack>
-                        )}
+  useEffect(() => {
+    fetchData(page, rowsPerPage, searchKeyword, order, orderBy);
+  }, [page, rowsPerPage, searchKeyword, order, orderBy, fetchData, refreshFlag]);
 
-                        <Menu
-                            anchorEl={columnMenuAnchor}
-                            open={Boolean(columnMenuAnchor)}
-                            onClose={handleColumnMenuClose}
-                            PaperProps={{
-                                style: {
-                                    maxHeight: 300,
-                                    width: 200
-                                }
-                            }}
-                        >
-                            <MenuItem disabled>
-                                <Typography variant="subtitle2">{t('logPage.selectColumns')}</Typography>
-                            </MenuItem>
-                            <MenuItem onClick={handleSelectAllColumns} dense>
-                                <Checkbox
-                                    checked={Object.values(columnVisibility).every((visible) => visible)}
-                                    indeterminate={
-                                        !Object.values(columnVisibility).every((visible) => visible) &&
-                                        Object.values(columnVisibility).some((visible) => visible)
-                                    }
-                                    size="small"
-                                />
-                                <ListItemText primary={t('logPage.columnSelectAll')} />
-                            </MenuItem>
-                            {[
-                                { id: 'created_at', label: t('logPage.timeLabel') },
-                                { id: 'channel_id', label: t('logPage.channelLabel'), adminOnly: true },
-                                { id: 'user_id', label: t('logPage.userLabel'), adminOnly: true },
-                                { id: 'group', label: t('logPage.groupLabel') },
-                                { id: 'token_name', label: t('logPage.tokenLabel') },
-                                { id: 'type', label: t('logPage.typeLabel') },
-                                { id: 'model_name', label: t('logPage.modelLabel') },
-                                { id: 'duration', label: t('logPage.durationLabel') },
-                                { id: 'message', label: t('logPage.inputLabel') },
-                                { id: 'completion', label: t('logPage.outputLabel') },
-                                { id: 'quota', label: t('logPage.quotaLabel') },
-                                { id: 'quota_source', label: '额度来源' },
-                                { id: 'source_ip', label: t('logPage.sourceIp') },
-                                { id: 'detail', label: t('logPage.detailLabel') }
-                            ].map(
-                                (column) =>
-                                    (!column.adminOnly || userIsAdmin) && (
-                                        <MenuItem key={column.id} onClick={() => handleColumnVisibilityChange(column.id)} dense>
-                                            <Checkbox checked={columnVisibility[column.id] || false} size="small" />
-                                            <ListItemText primary={column.label} />
-                                        </MenuItem>
-                                    )
-                            )}
-                        </Menu>
-                    </Container>
-                </Toolbar>
-                {searching && <LinearProgress />}
-                <PerfectScrollbar component="div">
-                    <TableContainer sx={{ overflow: 'unset' }}>
-                        <Table sx={{ minWidth: 800 }}>
-                            <KeywordTableHead
-                                order={order}
-                                orderBy={orderBy}
-                                onRequestSort={handleSort}
-                                headLabel={[
-                                    {
-                                        id: 'created_at',
-                                        label: t('logPage.timeLabel'),
-                                        disableSort: false,
-                                        hide: !columnVisibility.created_at
-                                    },
-                                    {
-                                        id: 'channel_id',
-                                        label: t('logPage.channelLabel'),
-                                        disableSort: false,
-                                        hide: !columnVisibility.channel_id || !userIsAdmin
-                                    },
-                                    {
-                                        id: 'user_id',
-                                        label: t('logPage.userLabel'),
-                                        disableSort: false,
-                                        hide: !columnVisibility.user_id || !userIsAdmin
-                                    },
-                                    {
-                                        id: 'group',
-                                        label: t('logPage.groupLabel'),
-                                        disableSort: false,
-                                        hide: !columnVisibility.group
-                                    },
-                                    {
-                                        id: 'token_name',
-                                        label: t('logPage.tokenLabel'),
-                                        disableSort: false,
-                                        hide: !columnVisibility.token_name
-                                    },
-                                    {
-                                        id: 'type',
-                                        label: t('logPage.typeLabel'),
-                                        disableSort: false,
-                                        hide: !columnVisibility.type
-                                    },
-                                    {
-                                        id: 'model_name',
-                                        label: t('logPage.modelLabel'),
-                                        disableSort: false,
-                                        hide: !columnVisibility.model_name
-                                    },
-                                    {
-                                        id: 'duration',
-                                        label: t('logPage.durationLabel'),
-                                        tooltip: t('logPage.durationTooltip'),
-                                        disableSort: true,
-                                        hide: !columnVisibility.duration
-                                    },
-                                    {
-                                        id: 'message',
-                                        label: t('logPage.inputLabel'),
-                                        disableSort: true,
-                                        hide: !columnVisibility.message
-                                    },
-                                    {
-                                        id: 'completion',
-                                        label: t('logPage.outputLabel'),
-                                        disableSort: true,
-                                        hide: !columnVisibility.completion
-                                    },
-                                    {
-                                        id: 'quota',
-                                        label: t('logPage.quotaLabel'),
-                                        disableSort: true,
-                                        hide: !columnVisibility.quota
-                                    },
-                                    {
-                                        id: 'quota_source',
-                                        label: '额度来源',
-                                        disableSort: true,
-                                        hide: !columnVisibility.quota_source
-                                    },
-                                    {
-                                        id: 'source_ip',
-                                        label: t('logPage.sourceIp'),
-                                        disableSort: true,
-                                        hide: !columnVisibility.source_ip
-                                    },
-                                    {
-                                        id: 'detail',
-                                        label: t('logPage.detailLabel'),
-                                        disableSort: true,
-                                        hide: !columnVisibility.detail
-                                    }
-                                ]}
-                            />
-                            <TableBody>
-                                {logs.map((row, index) => (
-                                    <LogTableRow
-                                        item={row}
-                                        key={`${row.id}_${index}`}
-                                        userIsAdmin={userIsAdmin}
-                                        userGroup={userGroup}
-                                        columnVisibility={columnVisibility}
-                                    />
-                                ))}
-                            </TableBody>
-                        </Table>
-                    </TableContainer>
-                </PerfectScrollbar>
-                <TablePagination
-                    page={page}
-                    component="div"
-                    count={listCount}
-                    rowsPerPage={rowsPerPage}
-                    onPageChange={handleChangePage}
-                    rowsPerPageOptions={PAGE_SIZE_OPTIONS}
-                    onRowsPerPageChange={handleChangeRowsPerPage}
-                    showFirstButton
-                    showLastButton
+  // 初始化时获取空间列表
+  useEffect(() => {
+    if (!userIsAdmin) {
+      fetchContexts();
+    }
+  }, [userIsAdmin]);
+
+  return (
+    <>
+      <Stack direction="row" alignItems="center" justifyContent="space-between" mb={5}>
+        <Stack direction="column" spacing={1}>
+          <Stack direction="row" alignItems="center" spacing={2}>
+            <Typography variant="h2">{t('logPage.title')}</Typography>
+            {currentContext && (
+              <Chip
+                icon={<Icon icon={isTeamContext ? 'solar:users-group-rounded-bold-duotone' : 'solar:user-bold-duotone'} />}
+                label={currentContext.name}
+                color={isTeamContext ? 'primary' : 'default'}
+                variant="outlined"
+                size="small"
+              />
+            )}
+          </Stack>
+          <Typography variant="subtitle1" color="text.secondary">
+            {isTeamContext ? '团队日志' : '个人日志'}
+          </Typography>
+        </Stack>
+      </Stack>
+      <Card>
+        <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
+          <Tabs
+            value={toolBarValue.log_type}
+            onChange={handleTabsChange}
+            aria-label="basic tabs example"
+            variant="scrollable"
+            scrollButtons="auto"
+            allowScrollButtonsMobile
+            sx={{
+              '& .MuiTabs-indicator': {
+                display: 'none'
+              }
+            }}
+          >
+            {Object.values(LogType).map((option) => {
+              return <Tab key={option.value} label={option.text} value={option.value} />;
+            })}
+          </Tabs>
+        </Box>
+        <Box component="form" noValidate>
+          <TableToolBar
+            filterName={toolBarValue}
+            handleFilterName={handleToolBarValue}
+            userIsAdmin={userIsAdmin}
+            contexts={contexts}
+            selectedContextId={selectedContextId}
+            onContextChange={handleContextFilterChange}
+          />
+        </Box>
+        <Toolbar
+          sx={{
+            textAlign: 'right',
+            height: 50,
+            display: 'flex',
+            justifyContent: 'space-between',
+            p: (theme) => theme.spacing(0, 1, 0, 3)
+          }}
+        >
+          <Container maxWidth="xl">
+            {matchUpMd ? (
+              <ButtonGroup variant="outlined" aria-label="outlined small primary button group">
+                <Button onClick={handleRefresh} size="small" startIcon={<Icon icon="solar:refresh-bold-duotone" width={18} />}>
+                  {t('logPage.refreshButton')}
+                </Button>
+
+                <Button onClick={searchLogs} size="small" startIcon={<Icon icon="solar:minimalistic-magnifer-line-duotone" width={18} />}>
+                  {t('logPage.searchButton')}
+                </Button>
+
+                <Button onClick={handleColumnMenuOpen} size="small" startIcon={<Icon icon="solar:settings-bold-duotone" width={18} />}>
+                  {t('logPage.columnSettings')}
+                </Button>
+              </ButtonGroup>
+            ) : (
+              <Stack
+                direction="row"
+                spacing={1}
+                divider={<Divider orientation="vertical" flexItem />}
+                justifyContent="space-around"
+                alignItems="center"
+              >
+                <IconButton onClick={handleRefresh} size="small">
+                  <Icon icon="solar:refresh-bold-duotone" width={18} />
+                </IconButton>
+                <IconButton onClick={searchLogs} size="small">
+                  <Icon icon="solar:minimalistic-magnifer-line-duotone" width={18} />
+                </IconButton>
+                <IconButton onClick={handleColumnMenuOpen} size="small">
+                  <Icon icon="solar:settings-bold-duotone" width={18} />
+                </IconButton>
+              </Stack>
+            )}
+
+            <Menu
+              anchorEl={columnMenuAnchor}
+              open={Boolean(columnMenuAnchor)}
+              onClose={handleColumnMenuClose}
+              PaperProps={{
+                style: {
+                  maxHeight: 300,
+                  width: 200
+                }
+              }}
+            >
+              <MenuItem disabled>
+                <Typography variant="subtitle2">{t('logPage.selectColumns')}</Typography>
+              </MenuItem>
+              <MenuItem onClick={handleSelectAllColumns} dense>
+                <Checkbox
+                  checked={Object.values(columnVisibility).every((visible) => visible)}
+                  indeterminate={
+                    !Object.values(columnVisibility).every((visible) => visible) &&
+                    Object.values(columnVisibility).some((visible) => visible)
+                  }
+                  size="small"
                 />
-            </Card>
-        </>
-    );
+                <ListItemText primary={t('logPage.columnSelectAll')} />
+              </MenuItem>
+              {[
+                { id: 'created_at', label: t('logPage.timeLabel') },
+                { id: 'channel_id', label: t('logPage.channelLabel'), adminOnly: true },
+                { id: 'user_id', label: t('logPage.userLabel'), adminOnly: true },
+                { id: 'group', label: t('logPage.groupLabel') },
+                { id: 'token_name', label: t('logPage.tokenLabel') },
+                { id: 'type', label: t('logPage.typeLabel') },
+                { id: 'model_name', label: t('logPage.modelLabel') },
+                { id: 'duration', label: t('logPage.durationLabel') },
+                { id: 'message', label: t('logPage.inputLabel') },
+                { id: 'completion', label: t('logPage.outputLabel') },
+                { id: 'quota', label: t('logPage.quotaLabel') },
+                { id: 'quota_source', label: '额度来源' },
+                { id: 'source_ip', label: t('logPage.sourceIp') },
+                { id: 'detail', label: t('logPage.detailLabel') }
+              ].map(
+                (column) =>
+                  (!column.adminOnly || userIsAdmin) && (
+                    <MenuItem key={column.id} onClick={() => handleColumnVisibilityChange(column.id)} dense>
+                      <Checkbox checked={columnVisibility[column.id] || false} size="small" />
+                      <ListItemText primary={column.label} />
+                    </MenuItem>
+                  )
+              )}
+            </Menu>
+          </Container>
+        </Toolbar>
+        {searching && <LinearProgress />}
+        <PerfectScrollbar component="div">
+          <TableContainer sx={{ overflow: 'unset' }}>
+            <Table sx={{ minWidth: 800 }}>
+              <KeywordTableHead
+                order={order}
+                orderBy={orderBy}
+                onRequestSort={handleSort}
+                headLabel={[
+                  {
+                    id: 'created_at',
+                    label: t('logPage.timeLabel'),
+                    disableSort: false,
+                    hide: !columnVisibility.created_at
+                  },
+                  {
+                    id: 'channel_id',
+                    label: t('logPage.channelLabel'),
+                    disableSort: false,
+                    hide: !columnVisibility.channel_id || !userIsAdmin
+                  },
+                  {
+                    id: 'user_id',
+                    label: t('logPage.userLabel'),
+                    disableSort: false,
+                    hide: !columnVisibility.user_id || !userIsAdmin
+                  },
+                  {
+                    id: 'group',
+                    label: t('logPage.groupLabel'),
+                    disableSort: false,
+                    hide: !columnVisibility.group
+                  },
+                  {
+                    id: 'token_name',
+                    label: t('logPage.tokenLabel'),
+                    disableSort: false,
+                    hide: !columnVisibility.token_name
+                  },
+                  {
+                    id: 'type',
+                    label: t('logPage.typeLabel'),
+                    disableSort: false,
+                    hide: !columnVisibility.type
+                  },
+                  {
+                    id: 'model_name',
+                    label: t('logPage.modelLabel'),
+                    disableSort: false,
+                    hide: !columnVisibility.model_name
+                  },
+                  {
+                    id: 'duration',
+                    label: t('logPage.durationLabel'),
+                    tooltip: t('logPage.durationTooltip'),
+                    disableSort: true,
+                    hide: !columnVisibility.duration
+                  },
+                  {
+                    id: 'message',
+                    label: t('logPage.inputLabel'),
+                    disableSort: true,
+                    hide: !columnVisibility.message
+                  },
+                  {
+                    id: 'completion',
+                    label: t('logPage.outputLabel'),
+                    disableSort: true,
+                    hide: !columnVisibility.completion
+                  },
+                  {
+                    id: 'quota',
+                    label: t('logPage.quotaLabel'),
+                    disableSort: true,
+                    hide: !columnVisibility.quota
+                  },
+                  {
+                    id: 'quota_source',
+                    label: '额度来源',
+                    disableSort: true,
+                    hide: !columnVisibility.quota_source
+                  },
+                  {
+                    id: 'source_ip',
+                    label: t('logPage.sourceIp'),
+                    disableSort: true,
+                    hide: !columnVisibility.source_ip
+                  },
+                  {
+                    id: 'detail',
+                    label: t('logPage.detailLabel'),
+                    disableSort: true,
+                    hide: !columnVisibility.detail
+                  }
+                ]}
+              />
+              <TableBody>
+                {logs.map((row, index) => (
+                  <LogTableRow
+                    item={row}
+                    key={`${row.id}_${index}`}
+                    userIsAdmin={userIsAdmin}
+                    userGroup={userGroup}
+                    columnVisibility={columnVisibility}
+                  />
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </PerfectScrollbar>
+        <TablePagination
+          page={page}
+          component="div"
+          count={listCount}
+          rowsPerPage={rowsPerPage}
+          onPageChange={handleChangePage}
+          rowsPerPageOptions={PAGE_SIZE_OPTIONS}
+          onRowsPerPageChange={handleChangeRowsPerPage}
+          showFirstButton
+          showLastButton
+        />
+      </Card>
+    </>
+  );
 }

@@ -28,44 +28,44 @@ import i18n from 'i18n/i18n';
 // ==============================|| APP ||============================== //
 
 const App = () => {
-    const dispatch = useDispatch();
-    const customization = useSelector((state) => state.customization);
+  const dispatch = useDispatch();
+  const customization = useSelector((state) => state.customization);
 
-    useEffect(() => {
-        const storedTheme = localStorage.getItem('theme');
-        if (storedTheme) {
-            dispatch({ type: SET_THEME, theme: storedTheme });
-        }
-    }, [dispatch]);
+  useEffect(() => {
+    const storedTheme = localStorage.getItem('theme');
+    if (storedTheme) {
+      dispatch({ type: SET_THEME, theme: storedTheme });
+    }
+  }, [dispatch]);
 
-    return (
-        <StyledEngineProvider injectFirst>
-            <ThemeProvider theme={themes(customization)}>
-                <CssBaseline />
-                <NavigationScroll>
-                    <SnackbarProvider
-                        autoHideDuration={5000}
-                        maxSnack={3}
-                        anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
-                        Components={{ copy: CopySnackbar }}
-                    >
-                        <StatusProvider>
-                            <I18nextProvider i18n={i18n}>
-                                <NoticeProvider>
-                                    <UserProvider>
-                                        <ContextProvider>
-                                            <Routes />
-                                            <NoticeDialogs />
-                                        </ContextProvider>
-                                    </UserProvider>
-                                </NoticeProvider>
-                            </I18nextProvider>
-                        </StatusProvider>
-                    </SnackbarProvider>
-                </NavigationScroll>
-            </ThemeProvider>
-        </StyledEngineProvider>
-    );
+  return (
+    <StyledEngineProvider injectFirst>
+      <ThemeProvider theme={themes(customization)}>
+        <CssBaseline />
+        <NavigationScroll>
+          <SnackbarProvider
+            autoHideDuration={5000}
+            maxSnack={3}
+            anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+            Components={{ copy: CopySnackbar }}
+          >
+            <StatusProvider>
+              <I18nextProvider i18n={i18n}>
+                <NoticeProvider>
+                  <UserProvider>
+                    <ContextProvider>
+                      <Routes />
+                      <NoticeDialogs />
+                    </ContextProvider>
+                  </UserProvider>
+                </NoticeProvider>
+              </I18nextProvider>
+            </StatusProvider>
+          </SnackbarProvider>
+        </NavigationScroll>
+      </ThemeProvider>
+    </StyledEngineProvider>
+  );
 };
 
 export default App;

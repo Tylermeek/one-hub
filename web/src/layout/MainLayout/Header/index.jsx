@@ -14,30 +14,30 @@ import { SidebarTrigger } from '@/components/ui/sidebar';
 // ==============================|| MAIN NAVBAR / HEADER ||============================== //
 
 const Header = () => {
-    const location = useLocation();
+  const location = useLocation();
 
-    // 检查当前路径是否为面板/控制台页面
-    const isConsoleRoute = location.pathname.startsWith('/panel');
+  // 检查当前路径是否为面板/控制台页面
+  const isConsoleRoute = location.pathname.startsWith('/panel');
 
-    return (
-        <>
-            {/* logo & sidebar trigger */}
-            <Box
-                sx={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 2
-                }}
-            >
-                <SidebarTrigger className="h-9 w-9" />
-                <Box component="span" sx={{ display: { xs: 'none', md: 'block' } }}>
-                    <LogoSection />
-                </Box>
-            </Box>
+  return (
+    <>
+      {/* logo & sidebar trigger */}
+      <Box
+        sx={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 2
+        }}
+      >
+        <SidebarTrigger className="h-9 w-9" />
+        <Box component="span" sx={{ display: { xs: 'none', md: 'block' } }}>
+          <LogoSection />
+        </Box>
+      </Box>
 
-            <Box sx={{ flexGrow: 1 }} />
-        </>
-    );
+      <Box sx={{ flexGrow: 1 }} />
+    </>
+  );
 };
 
 Header.propTypes = {};

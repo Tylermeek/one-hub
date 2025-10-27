@@ -7,9 +7,9 @@
  * 角色常量定义
  */
 export const ROLE = {
-    OWNER: 0,
-    ADMIN: 1,
-    MEMBER: 2
+  OWNER: 0,
+  ADMIN: 1,
+  MEMBER: 2
 };
 
 /**
@@ -18,7 +18,7 @@ export const ROLE = {
  * @returns {boolean}
  */
 export const isTeamOwner = (role) => {
-    return role === ROLE.OWNER;
+  return role === ROLE.OWNER;
 };
 
 /**
@@ -27,7 +27,7 @@ export const isTeamOwner = (role) => {
  * @returns {boolean}
  */
 export const canManageMembers = (role) => {
-    return role === ROLE.OWNER || role === ROLE.ADMIN;
+  return role === ROLE.OWNER || role === ROLE.ADMIN;
 };
 
 /**
@@ -38,16 +38,16 @@ export const canManageMembers = (role) => {
  * @returns {boolean}
  */
 export const canManageSpecificMember = (currentUserRole, targetUserRole) => {
-    // Owner 可以管理所有人
-    if (currentUserRole === ROLE.OWNER) return true;
+  // Owner 可以管理所有人
+  if (currentUserRole === ROLE.OWNER) return true;
 
-    // Admin 只能管理 Member
-    if (currentUserRole === ROLE.ADMIN) {
-        return targetUserRole === ROLE.MEMBER;
-    }
+  // Admin 只能管理 Member
+  if (currentUserRole === ROLE.ADMIN) {
+    return targetUserRole === ROLE.MEMBER;
+  }
 
-    // Member 不能管理任何人
-    return false;
+  // Member 不能管理任何人
+  return false;
 };
 
 /**
@@ -56,7 +56,7 @@ export const canManageSpecificMember = (currentUserRole, targetUserRole) => {
  * @returns {boolean}
  */
 export const canManageQuota = (role) => {
-    return role === ROLE.OWNER;
+  return role === ROLE.OWNER;
 };
 
 /**
@@ -65,7 +65,7 @@ export const canManageQuota = (role) => {
  * @returns {boolean}
  */
 export const canAccessSettings = (role) => {
-    return role === ROLE.OWNER || role === ROLE.ADMIN;
+  return role === ROLE.OWNER || role === ROLE.ADMIN;
 };
 
 /**
@@ -75,11 +75,11 @@ export const canAccessSettings = (role) => {
  * @returns {boolean}
  */
 export const canViewDetailedStats = (role, permissions = {}) => {
-    // Owner 和 Admin 始终可以查看
-    if (role === ROLE.OWNER || role === ROLE.ADMIN) return true;
+  // Owner 和 Admin 始终可以查看
+  if (role === ROLE.OWNER || role === ROLE.ADMIN) return true;
 
-    // Member 根据团队配置决定
-    return permissions.allowMemberViewStats !== false;
+  // Member 根据团队配置决定
+  return permissions.allowMemberViewStats !== false;
 };
 
 /**
@@ -88,7 +88,7 @@ export const canViewDetailedStats = (role, permissions = {}) => {
  * @returns {boolean}
  */
 export const canExportData = (role) => {
-    return role === ROLE.OWNER || role === ROLE.ADMIN;
+  return role === ROLE.OWNER || role === ROLE.ADMIN;
 };
 
 /**
@@ -97,7 +97,7 @@ export const canExportData = (role) => {
  * @returns {boolean}
  */
 export const canDissolveTeam = (role) => {
-    return role === ROLE.OWNER;
+  return role === ROLE.OWNER;
 };
 
 /**
@@ -106,7 +106,7 @@ export const canDissolveTeam = (role) => {
  * @returns {boolean}
  */
 export const canTransferOwnership = (role) => {
-    return role === ROLE.OWNER;
+  return role === ROLE.OWNER;
 };
 
 /**
@@ -115,7 +115,7 @@ export const canTransferOwnership = (role) => {
  * @returns {boolean}
  */
 export const canModifyTeamStatus = (role) => {
-    return role === ROLE.OWNER;
+  return role === ROLE.OWNER;
 };
 
 /**
@@ -124,7 +124,7 @@ export const canModifyTeamStatus = (role) => {
  * @returns {boolean}
  */
 export const canViewAllActivities = (role) => {
-    return role === ROLE.OWNER || role === ROLE.ADMIN;
+  return role === ROLE.OWNER || role === ROLE.ADMIN;
 };
 
 /**
@@ -135,13 +135,13 @@ export const canViewAllActivities = (role) => {
  * @returns {boolean}
  */
 export const canViewMemberDetails = (currentUserRole, targetUserId, currentUserId) => {
-    // Owner 和 Admin 可以查看所有成员
-    if (currentUserRole === ROLE.OWNER || currentUserRole === ROLE.ADMIN) {
-        return true;
-    }
+  // Owner 和 Admin 可以查看所有成员
+  if (currentUserRole === ROLE.OWNER || currentUserRole === ROLE.ADMIN) {
+    return true;
+  }
 
-    // Member 只能查看自己
-    return targetUserId === currentUserId;
+  // Member 只能查看自己
+  return targetUserId === currentUserId;
 };
 
 /**
@@ -150,16 +150,16 @@ export const canViewMemberDetails = (currentUserRole, targetUserId, currentUserI
  * @returns {string}
  */
 export const getRoleText = (role) => {
-    switch (role) {
-        case ROLE.OWNER:
-            return 'Owner';
-        case ROLE.ADMIN:
-            return 'Admin';
-        case ROLE.MEMBER:
-            return 'Member';
-        default:
-            return 'Unknown';
-    }
+  switch (role) {
+    case ROLE.OWNER:
+      return 'Owner';
+    case ROLE.ADMIN:
+      return 'Admin';
+    case ROLE.MEMBER:
+      return 'Member';
+    default:
+      return 'Unknown';
+  }
 };
 
 /**
@@ -168,16 +168,16 @@ export const getRoleText = (role) => {
  * @returns {string}
  */
 export const getRoleBadgeVariant = (role) => {
-    switch (role) {
-        case ROLE.OWNER:
-            return 'destructive'; // 红色
-        case ROLE.ADMIN:
-            return 'default'; // 蓝色
-        case ROLE.MEMBER:
-            return 'secondary'; // 灰色
-        default:
-            return 'outline';
-    }
+  switch (role) {
+    case ROLE.OWNER:
+      return 'destructive'; // 红色
+    case ROLE.ADMIN:
+      return 'default'; // 蓝色
+    case ROLE.MEMBER:
+      return 'secondary'; // 灰色
+    default:
+      return 'outline';
+  }
 };
 
 /**
@@ -187,6 +187,6 @@ export const getRoleBadgeVariant = (role) => {
  * @deprecated 使用 getRoleBadgeVariant 替代
  */
 export const getRoleColor = (role) => {
-    if (role === ROLE.OWNER) return 'error';
-    return role === ROLE.ADMIN ? 'primary' : 'default';
+  if (role === ROLE.OWNER) return 'error';
+  return role === ROLE.ADMIN ? 'primary' : 'default';
 };

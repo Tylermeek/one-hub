@@ -4,16 +4,16 @@ import zh_CN from './locales/zh_CN.json';
 import zh_HK from './locales/zh_HK.json';
 
 export const resources = {
-    ja_JP: {
-        translation: ja_JP
-    },
-    en_US: {
-        translation: en_US
-    },
-    zh_CN: {
-        translation: zh_CN
-    },
-    zh_HK: {
-        translation: zh_HK
-    }
+  ja_JP: {
+    translation: ja_JP
+  },
+  en_US: {
+    translation: en_US
+  },
+  zh_CN: {
+    translation: zh_CN
+  },
+  zh_HK: {
+    translation: zh_HK
+  }
 };

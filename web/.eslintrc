@@ -33,14 +33,14 @@
       }
     }
   },
-  "parser": "@babel/eslint-parser",
   "parserOptions": {
     "ecmaFeatures": {
       "experimentalObjectRestSpread": true,
       "impliedStrict": true,
       "jsx": true
     },
-    "ecmaVersion": 12
+    "ecmaVersion": 12,
+    "sourceType": "module"
   },
   "plugins": [
     "prettier",

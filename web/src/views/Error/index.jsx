@@ -8,42 +8,42 @@ import { useTranslation } from 'react-i18next';
 // ----------------------------------------------------------------------
 
 export default function NotFoundView() {
-    const { t } = useTranslation();
-    const navigate = useNavigate();
-    const goBack = () => {
-        navigate(-1);
-    };
-    return (
-        <>
-            <Container>
-                <Box
-                    sx={{
-                        py: 12,
-                        maxWidth: 480,
-                        mx: 'auto',
-                        display: 'flex',
-                        minHeight: 'calc(100vh - 136px)',
-                        textAlign: 'center',
-                        alignItems: 'center',
-                        flexDirection: 'column',
-                        justifyContent: 'center'
-                    }}
-                >
-                    <Box
-                        component="img"
-                        src={NotFound}
-                        sx={{
-                            mx: 'auto',
-                            height: 260,
-                            my: { xs: 5, sm: 10 }
-                        }}
-                    />
+  const { t } = useTranslation();
+  const navigate = useNavigate();
+  const goBack = () => {
+    navigate(-1);
+  };
+  return (
+    <>
+      <Container>
+        <Box
+          sx={{
+            py: 12,
+            maxWidth: 480,
+            mx: 'auto',
+            display: 'flex',
+            minHeight: 'calc(100vh - 136px)',
+            textAlign: 'center',
+            alignItems: 'center',
+            flexDirection: 'column',
+            justifyContent: 'center'
+          }}
+        >
+          <Box
+            component="img"
+            src={NotFound}
+            sx={{
+              mx: 'auto',
+              height: 260,
+              my: { xs: 5, sm: 10 }
+            }}
+          />
 
-                    <Button size="large" variant="contained" onClick={goBack}>
-                        {t('common.back')}
-                    </Button>
-                </Box>
-            </Container>
-        </>
-    );
+          <Button size="large" variant="contained" onClick={goBack}>
+            {t('common.back')}
+          </Button>
+        </Box>
+      </Container>
+    </>
+  );
 }
